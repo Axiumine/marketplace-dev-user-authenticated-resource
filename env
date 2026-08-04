@@ -1,0 +1,94 @@
+PORT=4032
+DOMAIN=xxx.tdweb.lan
+
+REDIS_IS_CLUSTER=1
+REDIS_DB1_HOST=db1
+REDIS_DB2_HOST=db2
+REDIS_DB3_HOST=db3
+REDIS_DB1_PORT=6379
+REDIS_DB2_PORT=6379
+REDIS_DB3_PORT=6379
+REDIS_USERNAME=
+REDIS_PASSWORD=
+REDIS_KEY=marketplaceDev:
+
+MONGODB_URI=mongodb+srv://adminxxx:pwd@rs0.gio.lan/testRnApollo?ssl=false
+
+# ── Integration tests: throwaway MongoDB (MONGO_TEST_*) ───────────────────────
+#
+# `yarn test:integration` ignores MONGODB_URI above and rebuilds it from this block, so the suite
+# never touches the dev database. Copy the four user/password values from marketplace-db-setup/.env —
+# it is the same cluster and the same two users. The database name is this service’s own.
+#
+# Two users on purpose, the same split production uses:
+#   OWNER — dbOwner. test/integration/globalSetup.mts drops MONGO_TEST_DB and replays every
+#           marketplace-db-setup migration with it, so the collections carry the real validators.
+#   R/W   — readWrite. The service under test connects with this one, so a resolver that quietly
+#           needs more than readWrite fails in the suite instead of in production.
+#
+# ⚠️ THREE variables name the test database and all three must carry the SAME name:
+# MONGO_TEST_DB, MONGO_TEST_AUTH_ADMIN, and the database path of MONGO_TEST_CONN_STRING.
+# vitest.mongo.mts refuses to build a URL when they disagree, because it rebuilds the path from
+# MONGO_TEST_DB — a connection string naming a different database would still connect, and the
+# suite would drop a database that string never mentioned.
+#
+# The name below belongs to this service alone; no other repo may reuse it, since every
+# suite drops its own database.
+#
+# authSource is therefore the test database itself, NOT `admin`: both users have to be created in
+# it, with a role on it — see marketplace-db-setup/setup/mongodb.js. Dropping the database does not
+# delete them; MongoDB keeps every user in admin.system.users whatever its auth database is.
+#
+# Shape: mongodb+srv://<host>/dbMarketplaceTestUserRes   (credentials are injected from the pairs below)
+MONGO_TEST_CONN_STRING=
+MONGO_TEST_AUTH_ADMIN=dbMarketplaceTestUserRes
+
+# DB OWNER USER
+MONGO_TEST_UDBOWNER=
+MONGO_TEST_PWDDBOWNER=
+
+# R/W USER
+MONGO_TEST_UDBRW=
+MONGO_TEST_PWDDBRW=
+
+MONGO_TEST_DB=dbMarketplaceTestUserRes
+
+
+NODE_ENV=development
+
+
+# ⚠️ Shorter than marketplace-dev-authenticated-resource's template, and every omission is deliberate —
+# this file is the only place the intended variable set is written down, so a leftover here reads as a
+# dependency the service does not have. Gone, with the reason:
+#
+#   UPLOAD_DIR / MAX_IMAGE_MB / MAX_VIDEO_MB   nothing is uploaded on this tier; no sharp, no clamscan
+#   SOCKETLABS_* / EMAIL_FROM / DEV_TEAM_EMAIL / PLATFORM_NAME
+#                                              no mail is sent here — registration, verification and
+#                                              password recovery all live on 4027
+#   REDIRECT_DOMAIN                            nothing redirects; this service answers GraphQL only
+#   SAMESITE_COOKIE / KEYGRIP_KEY_1 / KEYGRIP_KEY_2
+#                                              no cookie is signed or read here. The refresh cookie is
+#                                              minted and consumed by 4031; this tier reads the
+#                                              `Authorization: Bearer access:` header and nothing else
+#   HIT_STATS                                  unused
+#
+# Everything below IS read. `checkRequiredEnv()` in src/index.mts refuses to start without it.
+
+# Shared with all nine services on purpose — it is what lets the single logout service (4030) delete a
+# session by token content. The tier discriminator in the session hash, asserted by
+# authorizationAuthenticatedResourceHandler, is what keeps an Admin or ShopOwner token out of here.
+# (REDIS_KEY is set above, with the rest of the Redis block.)
+
+# Service-to-service bypass of the token check. Treat as a secret: never log it, never let it reach a
+# browser client. It must be SET — an unset one makes the comparison `'undefined' === 'undefined'` for
+# any caller who sends that literal string.
+INTROSPECTION_CODE='xxx'
+
+DSN="https://xxxxxxxxxxxxxx@bugsink.lan/1"
+
+# ── Qodana Ultimate Plus ──────────────────────────────────────────────────────
+# Project token from https://qodana.cloud (project settings → token). One token per
+# Cloud project: sharing one across services uploads every scan into the same project.
+# Required by ./qodana.sh to run the paid `jetbrains/qodana-js:2026.2` linter and to
+# enable coverage / license-audit / taint inspections.
+QODANA_TOKEN=
