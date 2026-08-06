@@ -48,9 +48,38 @@ review time: setting the default is one `$set` with nothing to clear first, and 
 address must unset the pointer in the same write**, which is why `funUserAddressDel` is an aggregation
 pipeline with `$$REMOVE` instead of a `$pull`.
 
-⚠️ **`test/` carries only `integration/globalSetup.mts`** — the harness, no tests, per the standing
-"skip all tests" instruction and matching `marketplace-shopowner`. The coverage gate therefore reports
-0% and a commit here needs `--no-verify`. Do not lower a threshold or remove a gate to work around it.
+## Tests
+
+**Eleven unit files, 247 tests, 100% on all four coverage metrics and a 100.00 mutation score.** The
+"skip all tests" instruction this repo was built under was revoked by the user on 2026-08-06; the suite
+was written from the harness up and both gates pass, so a commit here needs no `--no-verify`.
+
+⚠️ **The `integration` project cannot run: all seven `MONGO_TEST_*` keys are missing from `.env`.**
+`vitest.mongo.mts` refuses to build a URL without them and `missingTestMongoEnv()` names every one —
+`MONGO_TEST_CONN_STRING`, `MONGO_TEST_AUTH_ADMIN`, `MONGO_TEST_UDBOWNER`, `MONGO_TEST_PWDDBOWNER`,
+`MONGO_TEST_UDBRW`, `MONGO_TEST_PWDDBRW`, `MONGO_TEST_DB`. `marketplace-dev-user-authenticated-authorization`
+is missing the same block. Adding them is the user's call because it means provisioning two database
+users; the platform convention is that `MONGO_TEST_DB`, `MONGO_TEST_AUTH_ADMIN` and the database path
+of `MONGO_TEST_CONN_STRING` all carry the same name and that the name is unique to the repo
+(`dbMarketplaceTestUserRes` here), since every `globalSetup` drops its own database.
+
+Because of that, the three dispatch arms are covered from the **unit** project instead: `index.unit.test.mts`
+boots the real server with `createServer()`, listens on port 0 and drives `/health`, an unknown path, a full
+`{ me { … } }` POST, a ShopOwner session refused 403 and a bare GET refused by `csrfPrevention` — over a real
+socket, with Mongo and Redis mocked. That is not a substitute for the integration suite and does not pretend
+to be; it is what makes the coverage number honest without a database.
+
+Two things to keep in mind when adding a test here:
+
+- **Assert `extensions.description`, not the message, for anything text-carrying.** `throwGraphQLError`
+  puts the HTTP *title* in `message` — 'Bad Request', 'Forbidden' — so `toThrow('passwordNew must differ…')`
+  never matches, and two entirely different refusals share one envelope. `userLib.test.mts` has the
+  `rejection()` helper for the envelope and one explicit `description` assertion where the text is the only
+  thing separating two 400s.
+- **`schema.test.mts` imports `queries.mts` / `mutations.mts` inside `beforeEach`**, and that is not style.
+  A mutant that blanks a `GraphQLObjectType` name throws in the constructor; thrown at import time or in
+  `beforeAll` it marks every test *skipped*, which Stryker cannot attribute, so a killed mutant is reported
+  Survived. Inside `beforeEach` it fails the one test that was running.
 
 ## Version control
 
