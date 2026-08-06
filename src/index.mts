@@ -33,6 +33,11 @@ export const ENDPOINT = '/user-authenticated-resource'
  * `INTROSPECTION_CODE` stays: `authorizationAuthenticatedResourceHandler` compares against it, and an
  * unset one would make the comparison `'undefined' === 'undefined'` for any caller sending that
  * literal string.
+ *
+ * `DSN` is absent too, for a different reason than the rest: Sentry is *optional*.
+ * `Sentry.init({ dsn: undefined })` is a no-op, and requiring the variable made boot fail *silently* —
+ * checkRequiredEnv() runs outside start()'s try, so the throw reached only the top-level `.catch`, which
+ * reports to the very Sentry client the missing DSN had just disabled.
  */
 export const REQUIRED_ENV_VARS = [
 	'PORT',
@@ -47,8 +52,7 @@ export const REQUIRED_ENV_VARS = [
 	'REDIS_PASSWORD',
 	'REDIS_KEY',
 	'MONGODB_URI',
-	'INTROSPECTION_CODE',
-	'DSN'
+	'INTROSPECTION_CODE'
 ]
 
 /**
