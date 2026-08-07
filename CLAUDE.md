@@ -50,22 +50,35 @@ pipeline with `$$REMOVE` instead of a `$pull`.
 
 ## Tests
 
-**Eleven unit files, 247 tests, 100% on all four coverage metrics and a 100.00 mutation score.** The
+**Eleven unit files, 248 tests, 100% on all four coverage metrics and a 100.00 mutation score.** The
 "skip all tests" instruction this repo was built under was revoked by the user on 2026-08-06; the suite
 was written from the harness up and both gates pass, so a commit here needs no `--no-verify`.
 
-⚠️ **The `integration` project cannot run: five `MONGO_TEST_*` keys are missing from `.env`.**
-`vitest.mongo.mts` refuses to build a URL without them and `missingTestMongoEnv()` names every one —
-`MONGO_TEST_CONN_STRING`, `MONGO_TEST_UDBOWNER`, `MONGO_TEST_PWDDBOWNER`, `MONGO_TEST_UDBRW`,
-`MONGO_TEST_PWDDBRW`. It named all seven until 2026-08-07; `MONGO_TEST_DB` and `MONGO_TEST_AUTH_ADMIN`
-have since been filled in, and the five that remain are the connection string and the two users'
-credentials. `marketplace-dev-user-authenticated-authorization` is missing exactly the same five.
-Provisioning those two database users is the user's call; the platform convention is that
-`MONGO_TEST_DB`, `MONGO_TEST_AUTH_ADMIN` and the database path of `MONGO_TEST_CONN_STRING` all carry the
-same name and that the name is unique to the repo (`dbMarketplaceTestUserRes` here), since every
-`globalSetup` drops its own database.
+⚠️ **The `integration` project is configured and empty — `test/integration/` holds a `globalSetup.mts`
+and not one `*.itest.mts`.** It is therefore green by vacancy: vitest collects zero tests for that
+project and reports success, which reads exactly like a suite that ran. Everything this service is for —
+`me`, the personal-data write, the address CRUD and the default-address pointer — is proven against
+mocks and never against the real `$jsonSchema` validator or the real `$expr` that rejects a dangling
+`defaultAddress`. Those are the two things a mock cannot have an opinion about, so this is the gap worth
+closing first.
 
-Because of that, the three dispatch arms are covered from the **unit** project instead: `index.unit.test.mts`
+The environment that blocked it is no longer the obstacle. Until 2026-08-07 five `MONGO_TEST_*` keys
+were empty here — this machine's file was a copy of an unrelated old project's — so `vitest.mongo.mts`
+refused to build a URL and `missingTestMongoEnv()` named every one of them. They are filled in now and
+the two database users were provisioned with the loop in `marketplace-db-setup/setup/mongodb.js`. Two
+other keys in the same file were wrong rather than missing: `MONGODB_URI` pointed at `testRnApollo`, a
+leftover database from that other project with no `authSource`, and `INTROSPECTION_CODE` differed from
+the seven other services', which breaks the service-to-service bypass in both directions. The platform
+convention still holds — `MONGO_TEST_DB`, `MONGO_TEST_AUTH_ADMIN` and the database path of
+`MONGO_TEST_CONN_STRING` all carry the same name, unique to the repo (`dbMarketplaceTestUserRes` here),
+since every `globalSetup` drops its own database.
+
+⚠️ **A value containing whitespace must be quoted in that file.** dotenv terminates a bare value at the
+first space, hands back the truncated prefix and reports no error. Single quotes, not double: dotenv
+expands `\n` and `\r` escapes inside double quotes.
+
+While the integration project is empty, the three dispatch arms are covered from the **unit** project
+instead: `index.unit.test.mts`
 boots the real server with `createServer()`, listens on port 0 and drives `/health`, an unknown path, a full
 `{ me { … } }` POST, a ShopOwner session refused 403 and a bare GET refused by `csrfPrevention` — over a real
 socket, with Mongo and Redis mocked. That is not a substitute for the integration suite and does not pretend
