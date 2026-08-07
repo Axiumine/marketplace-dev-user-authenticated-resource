@@ -134,7 +134,7 @@ describe('funUserAddressDel', () => {
 	it('filters the element out and clears the pointer in one write', async () => {
 		await funUserAddressDel(userId, addressId)
 
-		const [filter, pipeline] = userUpdateOne.mock.calls[0]
+		const [filter, pipeline, options] = userUpdateOne.mock.calls[0]
 
 		// The array is named in the filter as well as in the pipeline: without it the update runs on a
 		// document that may no longer hold the address, and reports success.
@@ -148,6 +148,33 @@ describe('funUserAddressDel', () => {
 		expect(pipeline[1]).toEqual({
 			$set: { defaultAddress: { $cond: [{ $eq: ['$defaultAddress', addressId] }, '$$REMOVE', '$defaultAddress'] } }
 		})
+		// ⚠️ Not decoration. Mongoose 9 refuses an array update outright — `Cannot pass an array to
+		// query updates unless the 'updatePipeline' option is set.` — thrown before the driver is
+		// reached, so without this every address delete answered 500. Nothing in this file could have
+		// caught it: `User.updateOne` is mocked, and a mock takes an array happily.
+		expect(options).toEqual({ updatePipeline: true })
+	})
+
+	/*
+	 * ⚠️ The id arrives as a **string**, whatever the signature says: `GraphQLID` resolves to one, and
+	 * the resolver hands it straight through. Mongoose casts a filter against the schema but treats a
+	 * pipeline as an opaque aggregation expression and casts nothing inside it — so an uncoerced
+	 * `{ $ne: ['$$this._id', '507f…'] }` compares an ObjectId to a string, is never equal, keeps every
+	 * element and answers `matchedCount: 1, modifiedCount: 0`. A matched document that was not touched.
+	 *
+	 * The ObjectId case above cannot pin this: `new Types.ObjectId(oid)` deep-equals its argument, so
+	 * dropping the coercion looks identical there. Passing a string is what makes the difference
+	 * observable.
+	 */
+	it('coerces a string id, so the pipeline compares ObjectId to ObjectId', async () => {
+		await funUserAddressDel(userId, addressId.toHexString() as unknown as Types.ObjectId)
+
+		const [filter, pipeline] = userUpdateOne.mock.calls[0]
+
+		expect(filter['addresses._id']).toBeInstanceOf(Types.ObjectId)
+		expect(pipeline[0].$set.addresses.$filter.cond.$ne[1]).toBeInstanceOf(Types.ObjectId)
+		expect(pipeline[1].$set.defaultAddress.$cond[0].$eq[1]).toBeInstanceOf(Types.ObjectId)
+		expect(pipeline[0].$set.addresses.$filter.cond.$ne[1]).toEqual(addressId)
 	})
 
 	it('answers 500 when the delete did not land', async () => {

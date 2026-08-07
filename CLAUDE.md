@@ -50,17 +50,35 @@ pipeline with `$$REMOVE` instead of a `$pull`.
 
 ## Tests
 
-**Eleven unit files, 248 tests, 100% on all four coverage metrics and a 100.00 mutation score.** The
-"skip all tests" instruction this repo was built under was revoked by the user on 2026-08-06; the suite
-was written from the harness up and both gates pass, so a commit here needs no `--no-verify`.
+**Sixteen files, 309 tests, 100% on all four coverage metrics and a 100.00 mutation score** — eleven unit
+files (249 tests) plus five `*.itest.mts` (60 tests). The "skip all tests" instruction this repo was built
+under was revoked by the user on 2026-08-06; the suite was written from the harness up and both gates pass,
+so a commit here needs no `--no-verify`.
 
-⚠️ **The `integration` project is configured and empty — `test/integration/` holds a `globalSetup.mts`
-and not one `*.itest.mts`.** It is therefore green by vacancy: vitest collects zero tests for that
-project and reports success, which reads exactly like a suite that ran. Everything this service is for —
-`me`, the personal-data write, the address CRUD and the default-address pointer — is proven against
-mocks and never against the real `$jsonSchema` validator or the real `$expr` that rejects a dangling
-`defaultAddress`. Those are the two things a mock cannot have an opinion about, so this is the gap worth
-closing first.
+⚠️ **The integration project was configured and empty until 2026-08-07, and it found two production bugs
+in its first run — both in `funUserAddressDel`, both structurally invisible to the unit suite.** It had
+been green by vacancy: vitest collects zero tests for a project with no matching files and reports success,
+which reads exactly like a suite that ran. What it was not proving was the whole point of this service —
+`me`, the personal-data write, the address CRUD and the default-address pointer, all asserted against mocks
+and never against the real `$jsonSchema` or the real `$expr` that rejects a dangling `defaultAddress`.
+
+The two bugs, recorded because each is a class of mistake rather than a typo, and **every address delete on
+the customer tier answered 500** until both were fixed:
+
+1. **Mongoose 9 refuses an array update outright** unless `{ updatePipeline: true }` is passed —
+   `Cannot pass an array to query updates unless the 'updatePipeline' option is set.`, thrown in
+   `Query.prototype` before the driver is reached. `funUserAddressDel` is the only pipeline update in the
+   workspace, so nothing else was exposed. The unit suite mocks `User.updateOne`, and a mock takes an array
+   happily.
+2. **Mongoose casts a filter against the schema and casts nothing inside a pipeline.** A pipeline is an
+   opaque aggregation expression to it. `GraphQLID` resolves to a **string**, whatever `IArgs` declares, so
+   `{ $ne: ['$$this._id', '68b1…'] }` compared an ObjectId to a string, was never equal, kept every element
+   and answered `matchedCount: 1, modifiedCount: 0` — a matched document that was not touched. The filter
+   half worked, which is what made it look like a write that had simply not landed.
+
+Both are pinned in `userLib.test.mts` now, and the second needed a test that passes a **string** id:
+`new Types.ObjectId(oid)` deep-equals its argument, so with an ObjectId fixture the missing coercion is
+unobservable.
 
 The environment that blocked it is no longer the obstacle. Until 2026-08-07 five `MONGO_TEST_*` keys
 were empty here — this machine's file was a copy of an unrelated old project's — so `vitest.mongo.mts`
@@ -77,12 +95,27 @@ since every `globalSetup` drops its own database.
 first space, hands back the truncated prefix and reports no error. Single quotes, not double: dotenv
 expands `\n` and `\r` escapes inside double quotes.
 
-While the integration project is empty, the three dispatch arms are covered from the **unit** project
-instead: `index.unit.test.mts`
-boots the real server with `createServer()`, listens on port 0 and drives `/health`, an unknown path, a full
-`{ me { … } }` POST, a ShopOwner session refused 403 and a bare GET refused by `csrfPrevention` — over a real
-socket, with Mongo and Redis mocked. That is not a substitute for the integration suite and does not pretend
-to be; it is what makes the coverage number honest without a database.
+The five integration files, and what each is for:
+
+|File|Covers|
+|---|---|
+|`index.itest.mts`|the bearer gate against a live Redis session (412 / 499 / 498 / **403** for another tier and for a session with no `tier` at all), the `x-introspectioncode` bypass, CSRF on GET, a full `me` selection, and a secret-non-leak check that no hash reaches the wire|
+|`account.itest.mts`|`userPersonalDataUpdate` and `userUpdatePwd` against the real validator — including a raw-driver counter-proof that `contacts: { mobile: null }` is refused with `code: 121` while a real number is accepted, and real bcrypt on both sides of the password change|
+|`addresses.itest.mts`|the three address mutations plus `userDefaultAddressSet`, and a block that drives the collection validator directly: `$pull` of the default rejected, `$pull` of a non-default accepted, a foreign pointer rejected, a pointer with no `addresses` rejected|
+|`shutdown.itest.mts`|`gracefulShutdown`, the process-level handlers, production introspection refusal, and the 5s teardown budget lost for real against a local blackhole socket|
+|`startFailure.itest.mts`|`start()`'s catch arm with a URL MongoDB genuinely refuses, and the env guard running *outside* the try|
+
+`harness.mts` is shared by the four that need a server, and that is safe because **vitest gives each test
+file its own module registry** — the tracking arrays it exports are per-file, which is what lets
+`shutdown.itest.mts` destroy its connections without touching the other suites'. Seeding goes through the
+raw driver, every `_id` and every Redis key is registered **at creation time** rather than in a `finally`,
+and both are drained in `afterAll`.
+
+The unit project still boots a real server of its own in `index.unit.test.mts` — `createServer()`, port 0,
+`/health`, an unknown path, a `{ me { … } }` POST, a ShopOwner session refused 403 and a bare GET refused by
+`csrfPrevention` — over a real socket with Mongo and Redis mocked. It is what keeps the coverage number
+honest without a database, and Stryker runs the **unit project only** (`vitest.mutation.config.mts` narrows
+to `test/*.test.mts`), deliberately: mutating against real infrastructure would be slow and flaky.
 
 Two things to keep in mind when adding a test here:
 
