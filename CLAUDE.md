@@ -54,14 +54,16 @@ pipeline with `$$REMOVE` instead of a `$pull`.
 "skip all tests" instruction this repo was built under was revoked by the user on 2026-08-06; the suite
 was written from the harness up and both gates pass, so a commit here needs no `--no-verify`.
 
-⚠️ **The `integration` project cannot run: all seven `MONGO_TEST_*` keys are missing from `.env`.**
+⚠️ **The `integration` project cannot run: five `MONGO_TEST_*` keys are missing from `.env`.**
 `vitest.mongo.mts` refuses to build a URL without them and `missingTestMongoEnv()` names every one —
-`MONGO_TEST_CONN_STRING`, `MONGO_TEST_AUTH_ADMIN`, `MONGO_TEST_UDBOWNER`, `MONGO_TEST_PWDDBOWNER`,
-`MONGO_TEST_UDBRW`, `MONGO_TEST_PWDDBRW`, `MONGO_TEST_DB`. `marketplace-dev-user-authenticated-authorization`
-is missing the same block. Adding them is the user's call because it means provisioning two database
-users; the platform convention is that `MONGO_TEST_DB`, `MONGO_TEST_AUTH_ADMIN` and the database path
-of `MONGO_TEST_CONN_STRING` all carry the same name and that the name is unique to the repo
-(`dbMarketplaceTestUserRes` here), since every `globalSetup` drops its own database.
+`MONGO_TEST_CONN_STRING`, `MONGO_TEST_UDBOWNER`, `MONGO_TEST_PWDDBOWNER`, `MONGO_TEST_UDBRW`,
+`MONGO_TEST_PWDDBRW`. It named all seven until 2026-08-07; `MONGO_TEST_DB` and `MONGO_TEST_AUTH_ADMIN`
+have since been filled in, and the five that remain are the connection string and the two users'
+credentials. `marketplace-dev-user-authenticated-authorization` is missing exactly the same five.
+Provisioning those two database users is the user's call; the platform convention is that
+`MONGO_TEST_DB`, `MONGO_TEST_AUTH_ADMIN` and the database path of `MONGO_TEST_CONN_STRING` all carry the
+same name and that the name is unique to the repo (`dbMarketplaceTestUserRes` here), since every
+`globalSetup` drops its own database.
 
 Because of that, the three dispatch arms are covered from the **unit** project instead: `index.unit.test.mts`
 boots the real server with `createServer()`, listens on port 0 and drives `/health`, an unknown path, a full
