@@ -34,25 +34,50 @@ import { Types } from 'mongoose'
  * the `$cond` never needs a missing-field case of its own.
  */
 export async function funUserAddressDel(_id: Types.ObjectId, addressId: Types.ObjectId) {
-	const ret = await User.updateOne({ _id: _id, 'addresses._id': addressId }, [
-		{
-			$set: {
-				addresses: {
-					$filter: {
-						input: '$addresses',
-						cond: { $ne: ['$$this._id', addressId] }
+	// ⚠️ **Mongoose casts a filter against the schema; it does not cast anything inside a pipeline
+	// stage.** A pipeline is an opaque aggregation expression to it, so the two occurrences of
+	// `addressId` below reach MongoDB exactly as they arrive here — and `GraphQLID` resolves to a
+	// **string**, whatever `IArgs` claims. `{ $ne: ['$$this._id', '68b1…'] }` compares an ObjectId to a
+	// string, which is never equal, so `$filter` kept every element and the write answered
+	// `matchedCount: 1, modifiedCount: 0` — a matched document that was not touched. The filter above
+	// matched only because that half *is* cast.
+	//
+	// Coercing here rather than at the resolver keeps the fix where the requirement is: this is the one
+	// call on the platform whose argument must be a genuine instance. `new Types.ObjectId(…)` on an
+	// ObjectId is a no-op copy, so a caller that already holds one loses nothing.
+	const addressObjectId = new Types.ObjectId(addressId)
+
+	const ret = await User.updateOne(
+		{ _id: _id, 'addresses._id': addressObjectId },
+		[
+			{
+				$set: {
+					addresses: {
+						$filter: {
+							input: '$addresses',
+							cond: { $ne: ['$$this._id', addressObjectId] }
+						}
+					}
+				}
+			},
+			{
+				$set: {
+					defaultAddress: {
+						$cond: [{ $eq: ['$defaultAddress', addressObjectId] }, '$$REMOVE', '$defaultAddress']
 					}
 				}
 			}
-		},
-		{
-			$set: {
-				defaultAddress: {
-					$cond: [{ $eq: ['$defaultAddress', addressId] }, '$$REMOVE', '$defaultAddress']
-				}
-			}
-		}
-	]).exec()
+		],
+		// ⚠️ **Mongoose 9 refuses an array update unless this is set**, with
+		// `Cannot pass an array to query updates unless the 'updatePipeline' option is set.` — thrown
+		// before the driver is reached, so it surfaced as a 500 on every single address delete. The
+		// unit suite could not see it: it mocks `User.updateOne`, and a mock accepts an array happily.
+		//
+		// Per query rather than `mongoose.set('updatePipeline', true)` at boot. The global would switch
+		// the guard off for every model in the process, and the guard is worth keeping — an array
+		// reaching an update by accident is a typo, and everywhere else on this platform it still is.
+		{ updatePipeline: true }
+	).exec()
 
 	// `modifiedCount`: the filter matched an address, so the array must have shrunk. Anything else is
 	// a write that did not land, and the customer must not be told an address is gone when it is not.
