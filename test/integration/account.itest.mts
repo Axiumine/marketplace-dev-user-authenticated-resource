@@ -1,5 +1,10 @@
 import { encryptPassword } from '@axiumine/koa-utils/lib/encryptPassword'
 import { compareHashAsync } from '@axiumine/koa-utils/lib/hash'
+import { encryptDocument } from '@axiumine/marketplace-common/encryption/encryptDocument'
+import { ENCRYPTED_FIELDS_USER, KEY_ALT_NAME_USER } from '@axiumine/marketplace-common/encryption/encryptedFields'
+import { ALGORITHM_DETERMINISTIC } from '@axiumine/marketplace-common/encryption/EncryptionAlgorithm'
+import { encryptValue } from '@axiumine/marketplace-common/encryption/fieldEncryption'
+import { isCiphertext } from '@axiumine/marketplace-common/encryption/isCiphertext'
 import * as dotenv from 'dotenv'
 import type { Server } from 'http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -13,6 +18,7 @@ import {
 	gql,
 	PASSWORD_HASH,
 	readUser,
+	readUserEncrypted,
 	seedUser,
 	withSession,
 	withSignedInUser
@@ -83,6 +89,53 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 		}
 	})
 
+	// ADR-029, on the write the resolvers actually perform: the assertion above reads through
+	// `readUser`, which decrypts, so it cannot tell ciphertext-at-rest from plaintext-at-rest. This
+	// is the same save, read exactly as MongoDB returned it.
+	it('leaves every personal field on disk as ciphertext, and the email address deterministic', async () => {
+		const user = await withSignedInUser()
+
+		try {
+			await gql(save(FULL), user.headers)
+
+			const raw = await readUserEncrypted(user._id)
+			const personalData = raw?.personalData as Record<string, Record<string, unknown>>
+			// isCiphertext() is `binData` AND subtype 6, not "is a Binary": any other subtype would mean
+			// the value went in as something other than a CSFLE payload.
+			expect(isCiphertext(personalData.firstName)).toBe(true)
+			expect(isCiphertext(personalData.lastName)).toBe(true)
+			expect(isCiphertext(personalData.birth.date)).toBe(true)
+			expect(isCiphertext(personalData.contacts.mobile)).toBe(true)
+			expect(isCiphertext(personalData.contacts.landline)).toBe(true)
+			expect(isCiphertext(personalData.contacts.email)).toBe(true)
+			expect(isCiphertext((raw?.login as Record<string, unknown>).email)).toBe(true)
+			// The password is a bcrypt hash and stays a plain string: hashing it a second time under
+			// CSFLE would buy nothing and would break `compareHashAsync`.
+			expect(typeof (raw?.login as Record<string, unknown>).password).toBe('string')
+
+			// Deterministic on `login.email`, random everywhere else — the difference is the whole of
+			// ADR-029's algorithm choice, and nothing else in these suites would notice it being
+			// switched. The same address encrypts to the same ciphertext, which is what lets the login
+			// query still find an account by email; two identical contact emails do not.
+			const twin = await withSignedInUser()
+
+			try {
+				await gql(save(FULL), twin.headers)
+				const twinRaw = await readUserEncrypted(twin._id)
+				const twinPersonalData = twinRaw?.personalData as Record<string, Record<string, unknown>>
+
+				expect(twinPersonalData.contacts.email).not.toEqual(personalData.contacts.email)
+				expect(await encryptValue(user.email, ALGORITHM_DETERMINISTIC, KEY_ALT_NAME_USER)).toEqual(
+					(raw?.login as Record<string, unknown>).email
+				)
+			} finally {
+				await twin.cleanup()
+			}
+		} finally {
+			await user.cleanup()
+		}
+	})
+
 	/*
 	 * The replacement semantics, proved by a save that follows a full one. Every optional box comes
 	 * back empty and the stored sub-document is left holding two keys — not four with two nulls, and
@@ -130,10 +183,19 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 	 */
 	it('is refused by the database when a cleared contact is written as null', async () => {
 		const user = await seedUser()
-		const write = (contacts: Record<string, unknown>) =>
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, { $set: { personalData: { firstName: 'Julia', lastName: 'Rivers', contacts } } })
+		// Encrypted before the write, exactly as the model's plugin would (ADR-029) — the collection's
+		// `$jsonSchema` demands `binData` on every one of these paths since the same ADR, so a raw
+		// `$set` of plaintext is refused for the wrong reason and proves nothing about `null`.
+		// `encryptDocument` leaves a null null, which is the whole point of the second call below.
+		const write = async (contacts: Record<string, unknown>) => {
+			const { personalData } = await encryptDocument(
+				{ personalData: { firstName: 'Julia', lastName: 'Rivers', contacts } },
+				ENCRYPTED_FIELDS_USER,
+				KEY_ALT_NAME_USER
+			)
+
+			return db().collection('user').updateOne({ _id: user._id }, { $set: { personalData } })
+		}
 
 		// The shape the service does produce is accepted...
 		await expect(write({ mobile: '3331234567' })).resolves.toMatchObject({ modifiedCount: 1 })

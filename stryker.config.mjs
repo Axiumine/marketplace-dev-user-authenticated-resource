@@ -70,21 +70,24 @@ export default {
 		// Only two ranges are excluded, each for a distinct, verified reason:
 		'!src/index.mts',
 		// ⚠️ These are LINE NUMBERS in a file this repo rewrote — re-check them after any edit to
-		// src/index.mts. They shifted once already: this service's index.mts is shorter than the
+		// src/index.mts. They have shifted twice: this service's index.mts is shorter than the
 		// 4026 copy it started from (no graphqlUploadKoa, no initClamScan, a shorter
-		// REQUIRED_ENV_VARS), and a stale range silently mutates the wrong half of the file.
-		// Lines 1-112: imports through onUncaughtException. Fully reachable from the unit
+		// REQUIRED_ENV_VARS), and ADR-029 then added an import, two REQUIRED_ENV_VARS entries and
+		// the setupFieldEncryption() block. A stale range silently mutates the wrong half of the
+		// file: createServer() slides into the "in scope" range, and its mutants — which no unit
+		// test can reach by design — are reported as survivors nobody introduced.
+		// Lines 1-121: imports through onUncaughtException. Fully reachable from the unit
 		// project — kept in scope.
-		'src/index.mts:1-112',
-		// Lines 113-185 (createServer(), not re-included below): none of the start() failure
+		'src/index.mts:1-121',
+		// Lines 122-195 (createServer(), not re-included below): none of the start() failure
 		// tests reach it — each mocked datasource rejects before start() calls it. Only
 		// test/integration/index.itest.mts calls it, by booting the real server, and this run
 		// deliberately excludes that project (see the header of vitest.mutation.config.mts).
 		// Mutating it here would only produce NoCoverage noise, not signal.
-		// Lines 187-226: start()'s JSDoc plus the function body, whose Promise.all/try/catch
+		// Lines 196-247: start()'s JSDoc plus the function body, whose Promise.all/try/catch
 		// IS exercised by the failure-path tests above — kept in scope.
-		'src/index.mts:187-226'
-		// Lines 228-246 (the `if (process.env.NODE_ENV !== 'test')` entrypoint tail, not
+		'src/index.mts:196-247'
+		// Lines 248-267 (the `if (process.env.NODE_ENV !== 'test')` entrypoint tail, not
 		// re-included): already marked `/* v8 ignore start/stop */` in the source because it
 		// cannot run under the test process without killing the worker via process.exit.
 		// Every function it wires is tested directly above; the wiring itself has no branch
