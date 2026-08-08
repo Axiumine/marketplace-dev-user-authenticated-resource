@@ -8,12 +8,18 @@ const captureMessage = vi.fn()
 const RedisConnect = vi.fn()
 const MongoDBConnect = vi.fn()
 const disconnectAllDatabases = vi.fn()
+const setupFieldEncryption = vi.fn()
 const hGetAll = vi.fn()
 const findById = vi.fn()
 
 vi.mock('@sentry/node', () => ({ captureException, captureMessage }))
 vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ RedisConnect, redisClient: { hGetAll } }))
 vi.mock('@axiumine/koa-utils/dataSources/MongoDB', () => ({ MongoDBConnect }))
+// Mocked because the real one opens a ClientEncryption against a live cluster and reads a 96-byte
+// key file off disk (ADR-029) — neither exists in the unit project. What start() owes it is that it
+// is awaited and that its rejection lands in the same catch as a datasource failure, and both are
+// asserted below.
+vi.mock('@axiumine/marketplace-common/encryption/setupFieldEncryption', () => ({ setupFieldEncryption }))
 vi.mock('@lib/db/disconnectAllDatabases.mjs', () => ({ disconnectAllDatabases }))
 vi.mock('@axiumine/marketplace-common/models/MongoDB/User', () => ({ User: { findById } }))
 
@@ -65,7 +71,7 @@ describe('checkRequiredEnv', () => {
 	// tier does not have — `checkRequiredEnv` throws on a *missing* variable, so a leftover entry
 	// turns a perfectly bootable service into a startup crash. Pinned as an exact set: this is the
 	// only place the shortening is written down as something a test can defend.
-	it('demands the thirteen variables this tier actually reads, and no more', () => {
+	it('demands the fifteen variables this tier actually reads, and no more', () => {
 		expect(REQUIRED_ENV_VARS).toEqual([
 			'PORT',
 			'REDIS_IS_CLUSTER',
@@ -79,6 +85,8 @@ describe('checkRequiredEnv', () => {
 			'REDIS_PASSWORD',
 			'REDIS_KEY',
 			'MONGODB_URI',
+			'CSFLE_MASTER_KEY_PATH',
+			'CSFLE_KEY_VAULT_NAMESPACE',
 			'INTROSPECTION_CODE'
 		])
 	})
@@ -218,15 +226,26 @@ describe('process handlers', () => {
 	})
 })
 
+/**
+ * The state every start() test needs before it can assert anything: no leftover calls, both
+ * datasources and field encryption resolving, and a stub for every required variable so
+ * checkRequiredEnv() is never the thing that fails. Each test then rejects exactly the one it is
+ * about.
+ */
+function resetStartMocks() {
+	captureException.mockReset()
+	disconnectAllDatabases.mockReset()
+	RedisConnect.mockReset().mockResolvedValue(undefined)
+	MongoDBConnect.mockReset().mockResolvedValue(undefined)
+	setupFieldEncryption.mockReset().mockResolvedValue(undefined)
+	for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, 'x')
+}
+
 describe('start (failure path)', () => {
 	let errorLog: ReturnType<typeof vi.spyOn>
 
 	beforeEach(() => {
-		captureException.mockReset()
-		disconnectAllDatabases.mockReset()
-		RedisConnect.mockReset().mockResolvedValue(undefined)
-		MongoDBConnect.mockReset().mockResolvedValue(undefined)
-		for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, 'x')
+		resetStartMocks()
 		errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	})
 	afterEach(() => {
@@ -261,6 +280,20 @@ describe('start (failure path)', () => {
 		expect(errorLog).toHaveBeenCalledWith('error', error)
 	})
 
+	// A service that came up with field encryption broken would answer queries with ciphertext and
+	// write plaintext beside it, so this failure has to be as fatal as a datasource failure.
+	it('reports to Sentry and disconnects with code 1 when field encryption cannot start', async () => {
+		const error = new Error('CSFLE_MASTER_KEY_PATH is not set — field encryption cannot start without it')
+		setupFieldEncryption.mockRejectedValueOnce(error)
+
+		await start()
+
+		expect(setupFieldEncryption).toHaveBeenCalledTimes(1)
+		expect(captureException).toHaveBeenCalledWith(error)
+		expect(disconnectAllDatabases).toHaveBeenCalledWith(1)
+		expect(errorLog).toHaveBeenCalledWith('error', error)
+	})
+
 	// ⚠️ There is deliberately no ClamAV case here, and its absence is the assertion: this tier
 	// mounts neither `graphqlUploadKoa` nor `initClamScan`, so clamd is not a boot dependency. A
 	// customer uploads nothing, and the antivirus socket would have to be up for the service to
@@ -280,11 +313,7 @@ describe('start (failure path)', () => {
 
 describe('start (success path)', () => {
 	beforeEach(() => {
-		captureException.mockReset()
-		disconnectAllDatabases.mockReset()
-		RedisConnect.mockReset().mockResolvedValue(undefined)
-		MongoDBConnect.mockReset().mockResolvedValue(undefined)
-		for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, 'x')
+		resetStartMocks()
 		// Real value for the one env var httpServer.listen() actually needs to bind a socket — every
 		// other REQUIRED_ENV_VARS entry stays the harmless 'x' stub above. No HOSTNAME stub: the
 		// listen options carry no host key at all, so a live one would go unread.
@@ -306,6 +335,9 @@ describe('start (success path)', () => {
 		expect(server).toBeDefined()
 		expect(server?.httpServer.listening).toBe(true)
 		expect(listen).toHaveBeenCalledExactlyOnceWith({ port: '0' }, expect.any(Function))
+		// Once, with no arguments: it reads its configuration from the environment, and a caller that
+		// passed it anything would be building a second source of truth for the master key path.
+		expect(setupFieldEncryption).toHaveBeenCalledExactlyOnceWith()
 		expect(info).toHaveBeenCalledTimes(1)
 		expect(captureException).not.toHaveBeenCalled()
 		expect(disconnectAllDatabases).not.toHaveBeenCalled()

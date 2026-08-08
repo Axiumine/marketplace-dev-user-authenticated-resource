@@ -15,6 +15,12 @@ import {
  * address is built from `geo.js`'s `address({ maxLength: 250 })`, exactly like the shop owner's home
  * address, so that one street-address widget serves both frontends. Copying the company's number here
  * would reject an address the database accepts.
+ *
+ * ⚠️ **Since ADR-029 these three numbers are the ONLY thing enforcing them.** Every member of a saved
+ * address is `binData` at rest, and a `$jsonSchema` cannot measure the length of a ciphertext — the
+ * validator that used to be the backstop now only checks the BSON type. A bound relaxed or dropped
+ * here is not caught one layer down any more; it is simply gone, and a client can store a megabyte
+ * where a street was meant to go.
  */
 const MAX_ADDRESS = 250
 const MAX_CITY = 100

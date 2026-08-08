@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 
 import { redisClient } from '@axiumine/koa-utils/dataSources/Redis'
+import { decryptDocument } from '@axiumine/marketplace-common/encryption/decryptDocument'
+import { encryptDocument } from '@axiumine/marketplace-common/encryption/encryptDocument'
+import { ENCRYPTED_FIELDS_USER, KEY_ALT_NAME_USER } from '@axiumine/marketplace-common/encryption/encryptedFields'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import * as dotenv from 'dotenv'
 import type { Server } from 'http'
@@ -108,21 +111,57 @@ export async function seedUser(overrides: Record<string, unknown> = {}) {
 	const email = `itest-${randomUUID()}@marketplace.invalid`
 	const _id = new mongoose.Types.ObjectId()
 
+	// ⚠️ Encrypted after the overrides are spread in, and before the insert (ADR-029). After, so a
+	// caller that overrides `personalData` or `addresses` gets its own values encrypted too; before,
+	// because what this collection holds for a personal field is `binData` subtype 6, and a seed
+	// that wrote plaintext would be a document no resolver on the platform can produce.
 	await db()
 		.collection('user')
-		.insertOne({
-			_id,
-			login: { email, password: PASSWORD_HASH },
-			registeredAt: new Date(),
-			...overrides
-		})
+		.insertOne(
+			await encryptDocument(
+				{
+					_id,
+					login: { email, password: PASSWORD_HASH },
+					registeredAt: new Date(),
+					...overrides
+				},
+				ENCRYPTED_FIELDS_USER,
+				KEY_ALT_NAME_USER
+			)
+		)
 	seededUsers.push(_id)
 
 	return { _id, email }
 }
 
-/** Read one seeded customer straight back off the collection, bypassing every model and resolver. */
+/**
+ * Read one seeded customer straight back off the collection, bypassing every model and resolver,
+ * and decrypt it in place.
+ *
+ * ⚠️ Decrypting here rather than at the call sites is deliberate: the suites assert on what the
+ * resolvers *wrote*, and every one of those assertions would otherwise have to restate ADR-029's
+ * field map to know which values are now `Binary`. `decryptDocument` needs no map — it decrypts
+ * whatever is `binData` subtype 6, wherever it sits — so a call site that grows a new personal
+ * field keeps working. What is at rest is asserted separately, by `readUserEncrypted` below.
+ */
 export async function readUser(_id: mongoose.Types.ObjectId) {
+	const stored = await db().collection('user').findOne({ _id })
+
+	// In place, and it returns void: the document the caller gets back is the one just read, with
+	// every ciphertext replaced by its plaintext.
+	await decryptDocument(stored)
+
+	return stored
+}
+
+/**
+ * The same read, left exactly as MongoDB returned it.
+ *
+ * This is the only view that can tell ciphertext-at-rest from plaintext-at-rest: `readUser` above
+ * decrypts, and so does every model the services use, so a regression that stopped encrypting
+ * would round-trip perfectly through both and show up nowhere else.
+ */
+export async function readUserEncrypted(_id: mongoose.Types.ObjectId) {
 	return db().collection('user').findOne({ _id })
 }
 
