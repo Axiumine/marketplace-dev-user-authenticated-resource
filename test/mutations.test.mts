@@ -36,8 +36,8 @@ const addressId = new Types.ObjectId('507f1f77bcf86cd799439022')
 
 const ctx = { state: { user: { _id: userId } } } as unknown as IContextUserAuthenticatedResource
 
-const ADDRESS = { street: 'via Roma 1', postalCode: '20100', city: 'Milano', province: 'MI' }
-const PERSONAL_DATA = { firstName: 'Mario', lastName: 'Rossi' }
+const ADDRESS = { street: '1 main street', postalCode: '02109', city: 'Boston', province: 'MA' }
+const PERSONAL_DATA = { firstName: 'Mark', lastName: 'Rivers' }
 
 /** The HTTP title is the thrown `message`; the human text lives in `extensions.description`. */
 async function rejection(promise: Promise<unknown>) {
@@ -223,7 +223,7 @@ describe('userPersonalDataUpdate', () => {
 
 	it('refuses an invalid payload before writing anything', async () => {
 		expect(
-			await rejection(userPersonalDataUpdate.resolve(null, { personalData: { firstName: ' ', lastName: 'Rossi' } }, ctx))
+			await rejection(userPersonalDataUpdate.resolve(null, { personalData: { firstName: ' ', lastName: 'Rivers' } }, ctx))
 		).toEqual({ title: 'Bad Request', status: 400 })
 		expect(funUserPersonalDataUpdate).not.toHaveBeenCalled()
 	})

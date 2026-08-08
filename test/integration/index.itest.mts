@@ -212,22 +212,22 @@ describe('me (real projection over the real collection)', () => {
 		const user = await withSignedInUser({
 			registeredAt,
 			personalData: {
-				firstName: 'Giulia',
-				lastName: 'Rossi',
+				firstName: 'Julia',
+				lastName: 'Rivers',
 				birth: { date: birth },
-				contacts: { mobile: '3331234567', landline: '0354567890', email: 'giulia@marketplace.invalid' }
+				contacts: { mobile: '3331234567', landline: '0354567890', email: 'julia@marketplace.invalid' }
 			},
 			addresses: [
 				{
 					_id: addressId,
 					label: 'home',
-					street: 'Via Test 1',
-					postalCode: '24031',
-					city: 'Almenno San Salvatore',
-					province: 'BG',
+					street: '1 Test Street',
+					postalCode: '01103',
+					city: 'Springfield',
+					province: 'MA',
 					position: { type: 'Point', coordinates: [9.57, 45.75] }
 				},
-				{ _id: otherId, street: 'Via Test 2', postalCode: '20121', city: 'Milano', province: 'MI' }
+				{ _id: otherId, street: '2 Test Street', postalCode: '02108', city: 'Boston', province: 'MA' }
 			],
 			defaultAddress: addressId
 		})
@@ -240,18 +240,18 @@ describe('me (real projection over the real collection)', () => {
 				_id: user._id.toHexString(),
 				email: user.email,
 				personalData: {
-					firstName: 'Giulia',
-					lastName: 'Rossi',
+					firstName: 'Julia',
+					lastName: 'Rivers',
 					birth: { date: birth.toISOString() },
-					contacts: { mobile: '3331234567', landline: '0354567890', email: 'giulia@marketplace.invalid' }
+					contacts: { mobile: '3331234567', landline: '0354567890', email: 'julia@marketplace.invalid' }
 				},
 				addresses: [
 					{
 						_id: addressId.toHexString(),
-						street: 'Via Test 1',
-						postalCode: '24031',
-						city: 'Almenno San Salvatore',
-						province: 'BG',
+						street: '1 Test Street',
+						postalCode: '01103',
+						city: 'Springfield',
+						province: 'MA',
 						label: 'home',
 						// Floats, not Decimal128: `me` is `.lean()`, so no mongoose getter runs and whatever
 						// the driver deserialised reaches GraphQLFloat directly.
@@ -259,10 +259,10 @@ describe('me (real projection over the real collection)', () => {
 					},
 					{
 						_id: otherId.toHexString(),
-						street: 'Via Test 2',
-						postalCode: '20121',
-						city: 'Milano',
-						province: 'MI',
+						street: '2 Test Street',
+						postalCode: '02108',
+						city: 'Boston',
+						province: 'MA',
 						// Both optional on the element, and absent here rather than empty — an address typed by
 						// hand has no point until it is re-picked from the geocoder.
 						label: null,

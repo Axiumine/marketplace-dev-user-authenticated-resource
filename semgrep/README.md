@@ -27,7 +27,7 @@ The yarn scripts pass `--config semgrep/`, which loads every rule file in this
 directory (custom + vendored) in one shot.
 
 `custom.yml` carries **two** rules — `marketplace-no-log-introspection-code` and
-`marketplace-no-log-auth-token` — guarding the two secrets this Imprenditore-tier
+`marketplace-no-log-auth-token` — guarding the two secrets this User-tier
 resource service actually handles: the `x-introspectioncode` service-to-service
 bypass header and the opaque `Bearer access:<token>` this service validates
 against Redis on every request (see

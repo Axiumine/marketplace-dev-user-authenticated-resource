@@ -33,8 +33,8 @@ const { throwIfUserDontOwnAddress } = await import('../src/lib/user/throwIfUserD
 const userId = new Types.ObjectId('507f1f77bcf86cd799439011')
 const addressId = new Types.ObjectId('507f1f77bcf86cd799439022')
 
-const address = { street: 'via Roma 1', postalCode: '20100', city: 'Milano', province: 'MI' } as never
-const personalData = { firstName: 'Mario', lastName: 'Rossi' } as never
+const address = { street: '1 main street', postalCode: '02109', city: 'Boston', province: 'MA' } as never
+const personalData = { firstName: 'Mark', lastName: 'Rivers' } as never
 
 const updateExec = vi.fn()
 

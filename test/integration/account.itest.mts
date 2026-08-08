@@ -39,7 +39,7 @@ let httpServer: Server
  * Hashing at `SALT_ROUNDS = 14` costs well over a second, so this is hoisted deliberately: the
  * tests below spend their hashes on the assertions that are about hashing, not on their fixtures.
  */
-const CURRENT_PWD = 'vecchiaPassword1!'
+const CURRENT_PWD = 'oldPassword1!'
 let currentHash = ''
 
 beforeAll(async () => {
@@ -53,10 +53,10 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 	const save = (body: string) => `mutation { userPersonalDataUpdate(personalData: ${body}) }`
 
 	const FULL = `{
-		firstName: "Giulia"
-		lastName: "Rossi"
+		firstName: "Julia"
+		lastName: "Rivers"
 		birth: { date: "1990-06-15" }
-		contacts: { mobile: "3331234567", landline: "0354567890", email: "giulia@marketplace.invalid" }
+		contacts: { mobile: "3331234567", landline: "0354567890", email: "julia@marketplace.invalid" }
 	}`
 
 	it('writes the whole sub-document, and MongoDB accepts it', async () => {
@@ -71,12 +71,12 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 
 			const stored = await readUser(user._id)
 			expect(stored?.personalData).toEqual({
-				firstName: 'Giulia',
-				lastName: 'Rossi',
+				firstName: 'Julia',
+				lastName: 'Rivers',
 				// graphql-scalars' Date parses `YYYY-MM-DD` to midnight UTC, and the driver stores it as a
 				// BSON date — which is what `bsonType: 'date'` demands and what a string would have failed.
 				birth: { date: new Date('1990-06-15T00:00:00.000Z') },
-				contacts: { mobile: '3331234567', landline: '0354567890', email: 'giulia@marketplace.invalid' }
+				contacts: { mobile: '3331234567', landline: '0354567890', email: 'julia@marketplace.invalid' }
 			})
 		} finally {
 			await user.cleanup()
@@ -99,8 +99,8 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 			await gql(save(FULL), user.headers)
 
 			const cleared = `{
-				firstName: "  Giulia  "
-				lastName: "Bianchi"
+				firstName: "  Julia  "
+				lastName: "White"
 				birth: null
 				contacts: { mobile: "", landline: null, email: "   " }
 			}`
@@ -112,7 +112,7 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 			// `contacts` is absent entirely rather than `{}`: an empty object is legal against the
 			// validator but means nothing, and it would make "has this customer given us a number?" two
 			// questions instead of one.
-			expect(stored?.personalData).toEqual({ firstName: 'Giulia', lastName: 'Bianchi' })
+			expect(stored?.personalData).toEqual({ firstName: 'Julia', lastName: 'White' })
 		} finally {
 			await user.cleanup()
 		}
@@ -133,7 +133,7 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 		const write = (contacts: Record<string, unknown>) =>
 			db()
 				.collection('user')
-				.updateOne({ _id: user._id }, { $set: { personalData: { firstName: 'Giulia', lastName: 'Rossi', contacts } } })
+				.updateOne({ _id: user._id }, { $set: { personalData: { firstName: 'Julia', lastName: 'Rivers', contacts } } })
 
 		// The shape the service does produce is accepted...
 		await expect(write({ mobile: '3331234567' })).resolves.toMatchObject({ modifiedCount: 1 })
@@ -170,7 +170,7 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 
 			const today = new Date()
 			const yesterday = new Date(Date.UTC(today.getUTCFullYear() - 18, today.getUTCMonth(), today.getUTCDate() + 1))
-			const underage = `{ firstName: "Marco", lastName: "Verdi", birth: { date: "${yesterday.toISOString().slice(0, 10)}" } }`
+			const underage = `{ firstName: "Martin", lastName: "Green", birth: { date: "${yesterday.toISOString().slice(0, 10)}" } }`
 
 			const { status, json } = await gql(save(underage), user.headers)
 
@@ -180,7 +180,7 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 
 			// The 400 is raised before the write, so the profile saved a moment ago is untouched.
 			const stored = await readUser(user._id)
-			expect(stored?.personalData?.firstName).toBe('Giulia')
+			expect(stored?.personalData?.firstName).toBe('Julia')
 		} finally {
 			await user.cleanup()
 		}
@@ -191,7 +191,7 @@ describe('userPersonalDataUpdate (real $jsonSchema)', () => {
 		const user = await withSignedInUser()
 
 		try {
-			const { status, json } = await gql(save('{ firstName: "    ", lastName: "Rossi" }'), user.headers)
+			const { status, json } = await gql(save('{ firstName: "    ", lastName: "Rivers" }'), user.headers)
 
 			expect(status).toBe(400)
 			expect(json.errors?.[0]?.extensions?.description).toBe('firstName: field required')
@@ -208,7 +208,7 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 
 	it('replaces the stored hash with one the new password verifies against', async () => {
 		const user = await withSignedInUser({ login: { email: `pwd-${Date.now()}@marketplace.invalid`, password: currentHash } })
-		const passwordNew = 'nuovaPassword2!'
+		const passwordNew = 'newPassword2!'
 
 		try {
 			const { status, json } = await gql(change(CURRENT_PWD, passwordNew), user.headers)
@@ -232,7 +232,7 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 		const user = await withSignedInUser({ login: { email: `pwd-${Date.now()}-b@marketplace.invalid`, password: currentHash } })
 
 		try {
-			const { status, json } = await gql(change('passwordSbagliata1!', 'nuovaPassword2!'), user.headers)
+			const { status, json } = await gql(change('wrongPassword1!', 'newPassword2!'), user.headers)
 
 			expect(status).toBe(401)
 			expect(json.errors?.[0]?.message).toBe('Unauthorized')
@@ -266,7 +266,7 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 		const user = await withSignedInUser()
 
 		try {
-			const short = await gql(change(CURRENT_PWD, 'corta1!'), user.headers)
+			const short = await gql(change(CURRENT_PWD, 'short1!'), user.headers)
 			expect(short.status).toBe(400)
 			expect(short.json.errors?.[0]?.extensions?.description).toBe('Password is too short')
 
@@ -288,7 +288,7 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 		const user = await withSignedInUser({ disabled: true })
 
 		try {
-			const { status, json } = await gql(change(CURRENT_PWD, 'nuovaPassword2!'), user.headers)
+			const { status, json } = await gql(change(CURRENT_PWD, 'newPassword2!'), user.headers)
 
 			expect(status).toBe(401)
 			expect(json.errors?.[0]?.message).toBe('Unauthorized')
@@ -302,7 +302,7 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 		const user = await withSignedInUser({ deleted: new Date() })
 
 		try {
-			const { status } = await gql(change(CURRENT_PWD, 'nuovaPassword2!'), user.headers)
+			const { status } = await gql(change(CURRENT_PWD, 'newPassword2!'), user.headers)
 
 			expect(status).toBe(401)
 		} finally {
@@ -314,7 +314,7 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 		const session = await withSession()
 
 		try {
-			const { status, json } = await gql(change(CURRENT_PWD, 'nuovaPassword2!'), session.headers)
+			const { status, json } = await gql(change(CURRENT_PWD, 'newPassword2!'), session.headers)
 
 			expect(status).toBe(401)
 			expect(json.errors?.[0]?.message).toBe('Unauthorized')

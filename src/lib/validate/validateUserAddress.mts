@@ -1,4 +1,11 @@
-import { coordinate, optionalText, requiredText, SHAPE_CAP, SHAPE_PROVINCE, textWithFormat } from '@lib/validate/fields.mjs'
+import {
+	coordinate,
+	optionalText,
+	requiredText,
+	SHAPE_POSTAL_CODE,
+	SHAPE_PROVINCE,
+	textWithFormat
+} from '@lib/validate/fields.mjs'
 import { IUserAddress } from '@thedoctorweb_agency/marketplace-common/models/MongoDBInterfaces/IUserAddress'
 
 /*
@@ -55,11 +62,11 @@ export const validateUserAddress = (address: IUserAddressInput): Omit<IUserAddre
 
 	return {
 		street: requiredText(address.street, 'street', MAX_ADDRESS),
-		postalCode: textWithFormat(address.postalCode, 'postalCode', SHAPE_CAP, 'the postal code is 5 digits'),
+		postalCode: textWithFormat(address.postalCode, 'postalCode', SHAPE_POSTAL_CODE, 'the postal code is 5 digits'),
 		city: requiredText(address.city, 'city', MAX_CITY),
 		// Upper-cased on the way in, so `mi` and `MI` are one value in the database rather than two that
 		// sort apart and compare unequal. The pattern accepts either case on purpose — refusing a
-		// lower-case sigla would be a validation error over something the server can simply fix.
+		// lower-case province code would be a validation error over something the server can simply fix.
 		province: textWithFormat(address.province, 'province', SHAPE_PROVINCE, 'the province is the 2-letter code').toUpperCase(),
 		...(label === undefined ? {} : { label }),
 		...(position === undefined
