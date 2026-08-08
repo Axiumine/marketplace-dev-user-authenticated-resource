@@ -17,7 +17,7 @@ export default {
 	// at module top level or inside `beforeAll` — a throw in `beforeAll` only marks the suite's
 	// tests "skipped", which Stryker still can't attribute as a kill; a throw in `beforeEach`
 	// marks the one test about to run "failed", which it does attribute. See
-	// @thedoctorweb_agency/marketplace-common, which went from 45.95 to 100.00 with this flag
+	// @axiumine/marketplace-common, which went from 45.95 to 100.00 with this flag
 	// absent and the same fix applied. Static mutants are back in scope; none are excluded.
 	reporters: ['clear-text', 'progress', 'html'],
 	/**

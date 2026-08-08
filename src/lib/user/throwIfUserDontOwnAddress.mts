@@ -1,5 +1,5 @@
 import { throwForbiddenError } from '@axiumine/koa-utils/graphQL/throw/throwForbiddenError'
-import { User } from '@thedoctorweb_agency/marketplace-common/models/MongoDB/User'
+import { User } from '@axiumine/marketplace-common/models/MongoDB/User'
 import { Types } from 'mongoose'
 
 /**

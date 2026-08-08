@@ -13,10 +13,10 @@ const encryptPassword = vi.fn()
 // aggregation-pipeline `updateOne` because the pointer has to be cleared in the same write; a
 // regression to either of those would pass every assertion below and fail only against a real
 // collection validator.
-vi.mock('@thedoctorweb_agency/marketplace-common/models/MongoDB/User', () => ({
+vi.mock('@axiumine/marketplace-common/models/MongoDB/User', () => ({
 	User: { updateOne: userUpdateOne, countDocuments: userCountDocuments, findById: userFindById }
 }))
-vi.mock('@thedoctorweb_agency/marketplace-common/others/checkUserAuthorizationDisDel', () => ({ checkUserAuthorizationDisDel }))
+vi.mock('@axiumine/marketplace-common/others/checkUserAuthorizationDisDel', () => ({ checkUserAuthorizationDisDel }))
 // bcrypt at SALT_ROUNDS=14 is ~1s per hash. Both sides are stubbed: what is under test here is the
 // order of the checks, not the KDF.
 vi.mock('@axiumine/koa-utils/lib/hash', () => ({ compareHashAsync }))

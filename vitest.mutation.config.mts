@@ -18,13 +18,7 @@ import { nodeNextResolver } from './vitest.shared.mts'
 // `.mjs -> .mts` NodeNext rewrite and the single-graphql-realm pinning (this service also
 // inlines marketplace-common and koa-utils, since the schema embeds GraphQL objects they build)
 // are load bearing, not preferences.
-const inlineDeps = [
-	/graphql/,
-	/@apollo\/server/,
-	/@as-integrations/,
-	/@axiumine\/koa-utils/,
-	/@thedoctorweb_agency\/marketplace-common/
-]
+const inlineDeps = [/graphql/, /@apollo\/server/, /@as-integrations/, /@axiumine\/koa-utils/, /@axiumine\/marketplace-common/]
 
 export default defineConfig({
 	plugins: [nodeNextResolver],

@@ -1,6 +1,6 @@
 import { throwInternalError } from '@axiumine/koa-utils/graphQL/throw/throwInternalError'
-import { User } from '@thedoctorweb_agency/marketplace-common/models/MongoDB/User'
-import { IUserPersonalData } from '@thedoctorweb_agency/marketplace-common/models/MongoDBInterfaces/IUserPersonalData'
+import { User } from '@axiumine/marketplace-common/models/MongoDB/User'
+import { IUserPersonalData } from '@axiumine/marketplace-common/models/MongoDBInterfaces/IUserPersonalData'
 import { Types } from 'mongoose'
 
 /**

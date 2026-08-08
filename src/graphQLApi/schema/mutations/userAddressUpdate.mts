@@ -1,9 +1,9 @@
 import { tryCatchRethrow } from '@axiumine/koa-utils/lib/tryCatchRethrow'
+import { GraphQLInputUserAddress } from '@axiumine/marketplace-common/schema/GraphQLInput/GraphQLInputUserAddress'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
 import { funUserAddressUpdate } from '@lib/user/funUserAddressUpdate.mjs'
 import { throwIfUserDontOwnAddress } from '@lib/user/throwIfUserDontOwnAddress.mjs'
 import { IUserAddressInput, validateUserAddress } from '@lib/validate/validateUserAddress.mjs'
-import { GraphQLInputUserAddress } from '@thedoctorweb_agency/marketplace-common/schema/GraphQLInput/GraphQLInputUserAddress'
 import { GraphQLBoolean, GraphQLError, GraphQLID, GraphQLNonNull } from 'graphql'
 import { Types } from 'mongoose'
 

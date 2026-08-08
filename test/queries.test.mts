@@ -6,7 +6,7 @@ import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContext
 
 const findById = vi.fn()
 
-vi.mock('@thedoctorweb_agency/marketplace-common/models/MongoDB/User', () => ({ User: { findById } }))
+vi.mock('@axiumine/marketplace-common/models/MongoDB/User', () => ({ User: { findById } }))
 
 const { me } = await import('../src/graphQLApi/schema/queries/me.mts')
 

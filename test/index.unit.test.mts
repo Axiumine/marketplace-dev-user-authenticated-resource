@@ -15,7 +15,7 @@ vi.mock('@sentry/node', () => ({ captureException, captureMessage }))
 vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ RedisConnect, redisClient: { hGetAll } }))
 vi.mock('@axiumine/koa-utils/dataSources/MongoDB', () => ({ MongoDBConnect }))
 vi.mock('@lib/db/disconnectAllDatabases.mjs', () => ({ disconnectAllDatabases }))
-vi.mock('@thedoctorweb_agency/marketplace-common/models/MongoDB/User', () => ({ User: { findById } }))
+vi.mock('@axiumine/marketplace-common/models/MongoDB/User', () => ({ User: { findById } }))
 
 const {
 	ENDPOINT,

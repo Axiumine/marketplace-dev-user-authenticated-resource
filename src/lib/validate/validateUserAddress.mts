@@ -1,3 +1,4 @@
+import { IUserAddress } from '@axiumine/marketplace-common/models/MongoDBInterfaces/IUserAddress'
 import {
 	coordinate,
 	optionalText,
@@ -6,7 +7,6 @@ import {
 	SHAPE_PROVINCE,
 	textWithFormat
 } from '@lib/validate/fields.mjs'
-import { IUserAddress } from '@thedoctorweb_agency/marketplace-common/models/MongoDBInterfaces/IUserAddress'
 
 /*
  * The bounds of one element of `user.addresses`, read off marketplace-db-setup/lib/schemas/user.js.

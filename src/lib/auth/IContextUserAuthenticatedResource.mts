@@ -1,5 +1,5 @@
 import { TCommonHeaders } from '@axiumine/koa-utils/graphQL/schema/context/TCommonHeaders'
-import { IRedisDataUserForNode } from '@thedoctorweb_agency/marketplace-common/others/Redis/IRedisDataUserForNode'
+import { IRedisDataUserForNode } from '@axiumine/marketplace-common/others/Redis/IRedisDataUserForNode'
 import { IncomingHttpHeaders } from 'http'
 
 /**

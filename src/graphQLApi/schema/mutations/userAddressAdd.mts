@@ -1,9 +1,9 @@
 import { OnlyIdType } from '@axiumine/koa-utils/graphQL/schema/types/OnlyIdType'
 import { tryCatchRethrow } from '@axiumine/koa-utils/lib/tryCatchRethrow'
+import { GraphQLInputUserAddress } from '@axiumine/marketplace-common/schema/GraphQLInput/GraphQLInputUserAddress'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
 import { funUserAddressAdd } from '@lib/user/funUserAddressAdd.mjs'
 import { IUserAddressInput, validateUserAddress } from '@lib/validate/validateUserAddress.mjs'
-import { GraphQLInputUserAddress } from '@thedoctorweb_agency/marketplace-common/schema/GraphQLInput/GraphQLInputUserAddress'
 import { GraphQLError, GraphQLNonNull } from 'graphql'
 
 interface IArgs {
