@@ -16,10 +16,10 @@ function rejection(fn: () => unknown) {
 }
 
 const ADDRESS = {
-	street: 'via Roma 1',
-	postalCode: '20100',
-	city: 'Milano',
-	province: 'MI'
+	street: '1 main street',
+	postalCode: '02109',
+	city: 'Boston',
+	province: 'MA'
 }
 
 const TODAY = new Date('2026-08-07T00:00:00.000Z')
@@ -32,21 +32,21 @@ describe('validateUserAddress', () => {
 	it('answers the street block alone when nothing optional was sent', () => {
 		const address = validateUserAddress({ ...ADDRESS })
 
-		expect(address).toEqual({ street: 'via Roma 1', postalCode: '20100', city: 'Milano', province: 'MI' })
+		expect(address).toEqual({ street: '1 main street', postalCode: '02109', city: 'Boston', province: 'MA' })
 		expect(Object.keys(address).sort()).toEqual(['city', 'postalCode', 'province', 'street'])
 	})
 
 	it('trims every text field on the way in', () => {
-		const address = validateUserAddress({ ...ADDRESS, street: '  via Roma 1 ', city: ' Milano ' })
+		const address = validateUserAddress({ ...ADDRESS, street: '  1 main street ', city: ' Boston ' })
 
-		expect(address.street).toBe('via Roma 1')
-		expect(address.city).toBe('Milano')
+		expect(address.street).toBe('1 main street')
+		expect(address.city).toBe('Boston')
 	})
 
 	// Upper-cased server-side so `mi` and `MI` are one value in the database rather than two that
 	// sort apart and compare unequal. The pattern accepts either case precisely so this can happen.
 	it('upper-cases a lower-case province rather than refusing it', () => {
-		expect(validateUserAddress({ ...ADDRESS, province: 'mi' }).province).toBe('MI')
+		expect(validateUserAddress({ ...ADDRESS, province: 'ma' }).province).toBe('MA')
 	})
 
 	it('refuses a postal code that is not 5 digits', () => {
@@ -128,36 +128,36 @@ describe('validateUserPersonalData', () => {
 	// Same key-set rule as the address, one level up: `$set: { personalData }` replaces the whole
 	// sub-document, so a `birth: undefined` becomes a stored `null` and fails the collection.
 	it('answers the two required names alone when nothing else was sent', () => {
-		const personalData = validateUserPersonalData({ firstName: ' Mario ', lastName: ' Rossi ' }, TODAY)
+		const personalData = validateUserPersonalData({ firstName: ' Mark ', lastName: ' Rivers ' }, TODAY)
 
-		expect(personalData).toEqual({ firstName: 'Mario', lastName: 'Rossi' })
+		expect(personalData).toEqual({ firstName: 'Mark', lastName: 'Rivers' })
 		expect(Object.keys(personalData).sort()).toEqual(['firstName', 'lastName'])
 	})
 
 	it('refuses a blank first name', () => {
-		expect(rejection(() => validateUserPersonalData({ firstName: '  ', lastName: 'Rossi' }, TODAY))).toBe(
+		expect(rejection(() => validateUserPersonalData({ firstName: '  ', lastName: 'Rivers' }, TODAY))).toBe(
 			'firstName: field required'
 		)
 	})
 
 	it('refuses a blank last name', () => {
-		expect(rejection(() => validateUserPersonalData({ firstName: 'Mario', lastName: '' }, TODAY))).toBe(
+		expect(rejection(() => validateUserPersonalData({ firstName: 'Mark', lastName: '' }, TODAY))).toBe(
 			'lastName: field required'
 		)
 	})
 
 	it('caps both names at 100 characters', () => {
-		expect(rejection(() => validateUserPersonalData({ firstName: 'a'.repeat(101), lastName: 'Rossi' }, TODAY))).toBe(
+		expect(rejection(() => validateUserPersonalData({ firstName: 'a'.repeat(101), lastName: 'Rivers' }, TODAY))).toBe(
 			'firstName: max 100 characters'
 		)
-		expect(rejection(() => validateUserPersonalData({ firstName: 'Mario', lastName: 'a'.repeat(101) }, TODAY))).toBe(
+		expect(rejection(() => validateUserPersonalData({ firstName: 'Mark', lastName: 'a'.repeat(101) }, TODAY))).toBe(
 			'lastName: max 100 characters'
 		)
 	})
 
 	it('keeps a birth date that belongs to somebody of age', () => {
 		const date = new Date('2008-08-07T00:00:00.000Z')
-		const personalData = validateUserPersonalData({ firstName: 'Mario', lastName: 'Rossi', birth: { date } }, TODAY)
+		const personalData = validateUserPersonalData({ firstName: 'Mark', lastName: 'Rivers', birth: { date } }, TODAY)
 
 		expect(personalData.birth).toEqual({ date })
 	})
@@ -167,7 +167,7 @@ describe('validateUserPersonalData', () => {
 	it('refuses a birth date belonging to a minor, against the `today` it was handed', () => {
 		const date = new Date('2008-08-08T00:00:00.000Z')
 
-		expect(rejection(() => validateUserPersonalData({ firstName: 'Mario', lastName: 'Rossi', birth: { date } }, TODAY))).toBe(
+		expect(rejection(() => validateUserPersonalData({ firstName: 'Mark', lastName: 'Rivers', birth: { date } }, TODAY))).toBe(
 			'birth.date: you must be of age (at least 18)'
 		)
 	})
@@ -178,14 +178,14 @@ describe('validateUserPersonalData', () => {
 		['undefined', undefined],
 		['null', null]
 	])('omits the birth key entirely when it is %s', (_desc, birth) => {
-		expect('birth' in validateUserPersonalData({ firstName: 'Mario', lastName: 'Rossi', birth }, TODAY)).toBe(false)
+		expect('birth' in validateUserPersonalData({ firstName: 'Mark', lastName: 'Rivers', birth }, TODAY)).toBe(false)
 	})
 
 	it('keeps the three contacts that were filled in', () => {
 		const personalData = validateUserPersonalData(
 			{
-				firstName: 'Mario',
-				lastName: 'Rossi',
+				firstName: 'Mark',
+				lastName: 'Rivers',
 				contacts: { mobile: ' 3331234567 ', landline: '021234567', email: ' cliente@marketplace.test ' }
 			},
 			TODAY
@@ -203,7 +203,7 @@ describe('validateUserPersonalData', () => {
 	// stored as `null` and refused by a `bsonType: 'string'` property, losing the mobile with it.
 	it('drops the cleared contacts and keeps the filled one', () => {
 		const personalData = validateUserPersonalData(
-			{ firstName: 'Mario', lastName: 'Rossi', contacts: { mobile: '3331234567', landline: null, email: '' } },
+			{ firstName: 'Mark', lastName: 'Rivers', contacts: { mobile: '3331234567', landline: null, email: '' } },
 			TODAY
 		)
 
@@ -218,7 +218,7 @@ describe('validateUserPersonalData', () => {
 		['null', null],
 		['an object with every field cleared', { mobile: null, landline: '', email: undefined }]
 	])('omits the contacts key entirely for %s', (_desc, contacts) => {
-		const personalData = validateUserPersonalData({ firstName: 'Mario', lastName: 'Rossi', contacts }, TODAY)
+		const personalData = validateUserPersonalData({ firstName: 'Mark', lastName: 'Rivers', contacts }, TODAY)
 
 		expect('contacts' in personalData).toBe(false)
 	})
@@ -231,7 +231,7 @@ describe('validateUserPersonalData', () => {
 	])('caps the %s at 12 characters', (field, described) => {
 		expect(
 			rejection(() =>
-				validateUserPersonalData({ firstName: 'Mario', lastName: 'Rossi', contacts: { [field]: '1'.repeat(13) } }, TODAY)
+				validateUserPersonalData({ firstName: 'Mark', lastName: 'Rivers', contacts: { [field]: '1'.repeat(13) } }, TODAY)
 			)
 		).toBe(`${described}: max 12 characters`)
 	})
@@ -239,17 +239,17 @@ describe('validateUserPersonalData', () => {
 	it('refuses a contact email that does not look like one', () => {
 		expect(
 			rejection(() =>
-				validateUserPersonalData({ firstName: 'Mario', lastName: 'Rossi', contacts: { email: 'not-an-email' } }, TODAY)
+				validateUserPersonalData({ firstName: 'Mark', lastName: 'Rivers', contacts: { email: 'not-an-email' } }, TODAY)
 			)
 		).toBe('contacts.email: invalid email address')
 	})
 
 	it('does not mutate the object it was handed', () => {
-		const input = { firstName: ' Mario ', lastName: 'Rossi', contacts: { mobile: ' 3331234567 ' } }
+		const input = { firstName: ' Mark ', lastName: 'Rivers', contacts: { mobile: ' 3331234567 ' } }
 
 		validateUserPersonalData(input, TODAY)
 
-		expect(input.firstName).toBe(' Mario ')
+		expect(input.firstName).toBe(' Mark ')
 		expect(input.contacts.mobile).toBe(' 3331234567 ')
 	})
 })

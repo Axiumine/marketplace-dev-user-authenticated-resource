@@ -31,7 +31,7 @@ import { bootServer, db, drainAndClose, gql, readUser, seedUser, withSignedInUse
 let httpServer: Server
 
 const ADD = (extra = '') =>
-	`mutation { userAddressAdd(address: { street: "Via Roma 1", postalCode: "24031", city: "Almenno", province: "bg"${extra} }) { _id } }`
+	`mutation { userAddressAdd(address: { street: "1 Main Street", postalCode: "01103", city: "Springfield", province: "ma"${extra} }) { _id } }`
 
 const DEL = (_id: unknown) => `mutation { userAddressDel(_id: "${String(_id)}") }`
 const SET_DEFAULT = (_id: unknown) => `mutation { userDefaultAddressSet(_id: "${String(_id)}") }`
@@ -66,12 +66,12 @@ describe('userAddressAdd', () => {
 			expect(stored?.addresses).toEqual([
 				{
 					_id: addressId,
-					street: 'Via Roma 1',
-					postalCode: '24031',
-					city: 'Almenno',
+					street: '1 Main Street',
+					postalCode: '01103',
+					city: 'Springfield',
 					// Upper-cased on the way in, so `bg` and `BG` are one value in the database rather than two
 					// that sort apart and compare unequal.
-					province: 'BG'
+					province: 'MA'
 				}
 			])
 			// Not pointed at the first address automatically: the pointer is a value the customer chooses,
@@ -127,11 +127,11 @@ describe('userAddressAdd', () => {
 		const user = await withSignedInUser()
 
 		try {
-			const cap = await gql(ADD().replace('24031', '2403'), user.headers)
+			const cap = await gql(ADD().replace('01103', '2403'), user.headers)
 			expect(cap.status).toBe(400)
 			expect(cap.json.errors?.[0]?.extensions?.description).toBe('postalCode: the postal code is 5 digits')
 
-			const province = await gql(ADD().replace('"bg"', '"bergamo"'), user.headers)
+			const province = await gql(ADD().replace('"ma"', '"massachusetts"'), user.headers)
 			expect(province.json.errors?.[0]?.extensions?.description).toBe('province: the province is the 2-letter code')
 
 			// ±90 for latitude, not the ±180 longitude gets — a single rule for both would let this reach a
@@ -154,7 +154,7 @@ describe('userAddressUpdate', () => {
 			const addressId = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
 
 			const { status, json } = await gql(
-				UPDATE(addressId, '{ street: "Via Milano 2", postalCode: "20121", city: "Milano", province: "MI", label: "" }'),
+				UPDATE(addressId, '{ street: "2 Harbour Road", postalCode: "02108", city: "Boston", province: "MA", label: "" }'),
 				user.headers
 			)
 
@@ -165,7 +165,7 @@ describe('userAddressUpdate', () => {
 			// Whole-element replacement: the label and the point the customer cleared are gone rather than
 			// surviving under the new street. That is what an edit form means by an empty box.
 			expect(stored?.addresses).toEqual([
-				{ _id: addressId, street: 'Via Milano 2', postalCode: '20121', city: 'Milano', province: 'MI' }
+				{ _id: addressId, street: '2 Harbour Road', postalCode: '02108', city: 'Boston', province: 'MA' }
 			])
 		} finally {
 			await user.cleanup()
@@ -185,7 +185,7 @@ describe('userAddressUpdate', () => {
 			await gql(SET_DEFAULT(addressId), user.headers)
 
 			const { json } = await gql(
-				UPDATE(addressId, '{ street: "Via Milano 2", postalCode: "20121", city: "Milano", province: "MI" }'),
+				UPDATE(addressId, '{ street: "2 Harbour Road", postalCode: "02108", city: "Boston", province: "MA" }'),
 				user.headers
 			)
 			expect(json.errors).toBeUndefined()
@@ -193,7 +193,7 @@ describe('userAddressUpdate', () => {
 			const stored = await readUser(user._id)
 			expect(stored?.addresses[0]._id).toEqual(addressId)
 			expect(stored?.defaultAddress).toEqual(addressId)
-			expect(stored?.addresses[0].street).toBe('Via Milano 2')
+			expect(stored?.addresses[0].street).toBe('2 Harbour Road')
 		} finally {
 			await user.cleanup()
 		}
@@ -204,7 +204,7 @@ describe('userAddressUpdate', () => {
 
 		try {
 			const addressId = await addAddress(user.headers)
-			const body = '{ street: "Via Roma 1", postalCode: "24031", city: "Almenno", province: "BG" }'
+			const body = '{ street: "1 Main Street", postalCode: "01103", city: "Springfield", province: "MA" }'
 
 			await gql(UPDATE(addressId, body), user.headers)
 			// MongoDB reports `modifiedCount: 0` for this one, which is why the write path checks
@@ -361,12 +361,12 @@ describe('throwIfUserDontOwnAddress, over the real collection', () => {
 		const user = await withSignedInUser()
 		const strangerAddressId = new mongoose.Types.ObjectId()
 		const stranger = await seedUser({
-			addresses: [{ _id: strangerAddressId, street: 'Via Altrui 9', postalCode: '20121', city: 'Milano', province: 'MI' }],
+			addresses: [{ _id: strangerAddressId, street: '9 Other Street', postalCode: '02108', city: 'Boston', province: 'MA' }],
 			defaultAddress: strangerAddressId
 		})
 
 		try {
-			const body = '{ street: "Via Mia 1", postalCode: "24031", city: "Almenno", province: "BG" }'
+			const body = '{ street: "1 My Street", postalCode: "01103", city: "Springfield", province: "MA" }'
 
 			for (const query of [DEL(strangerAddressId), SET_DEFAULT(strangerAddressId), UPDATE(strangerAddressId, body)]) {
 				const { status, json } = await gql(query, user.headers)
@@ -378,7 +378,7 @@ describe('throwIfUserDontOwnAddress, over the real collection', () => {
 			// Untouched, and the guard ran before any write — not after one that silently matched nothing.
 			const other = await readUser(stranger._id)
 			expect(other?.addresses).toHaveLength(1)
-			expect(other?.addresses[0].street).toBe('Via Altrui 9')
+			expect(other?.addresses[0].street).toBe('9 Other Street')
 			expect(other?.defaultAddress).toEqual(strangerAddressId)
 		} finally {
 			await user.cleanup()
@@ -411,8 +411,8 @@ describe('what the collection validator refuses (raw driver)', () => {
 		const other = new mongoose.Types.ObjectId()
 		const user = await seedUser({
 			addresses: [
-				{ _id: addressId, street: 'Via Roma 1', postalCode: '24031', city: 'Almenno', province: 'BG' },
-				{ _id: other, street: 'Via Milano 2', postalCode: '20121', city: 'Milano', province: 'MI' }
+				{ _id: addressId, street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' },
+				{ _id: other, street: '2 Harbour Road', postalCode: '02108', city: 'Boston', province: 'MA' }
 			],
 			defaultAddress: addressId
 		})
@@ -441,7 +441,7 @@ describe('what the collection validator refuses (raw driver)', () => {
 	it('refuses a defaultAddress that names an address of somebody else', async () => {
 		const addressId = new mongoose.Types.ObjectId()
 		const user = await seedUser({
-			addresses: [{ _id: addressId, street: 'Via Roma 1', postalCode: '24031', city: 'Almenno', province: 'BG' }]
+			addresses: [{ _id: addressId, street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' }]
 		})
 
 		await expect(
@@ -487,10 +487,10 @@ describe('what the collection validator refuses (raw driver)', () => {
 					$push: {
 						addresses: {
 							_id: new mongoose.Types.ObjectId(),
-							street: 'Via Roma 1',
-							postalCode: '24031',
-							city: 'Almenno',
-							province: 'BG',
+							street: '1 Main Street',
+							postalCode: '01103',
+							city: 'Springfield',
+							province: 'MA',
 							// What a cleared text box serialises to over GraphQL, and what `optionalText`
 							// exists to turn into an absent key.
 							label: null
@@ -509,7 +509,7 @@ describe('what the collection validator refuses (raw driver)', () => {
 				.updateOne({ _id: user._id }, {
 					// `updateOne` is a query, so the Mongoose sub-document default that would supply an
 					// `_id` never runs — which is why `funUserAddressAdd` mints one by hand.
-					$push: { addresses: { street: 'Via Roma 1', postalCode: '24031', city: 'Almenno', province: 'BG' } }
+					$push: { addresses: { street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' } }
 				} as never)
 		).rejects.toMatchObject({ code: 121 })
 	})

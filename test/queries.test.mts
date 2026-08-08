@@ -29,8 +29,8 @@ function reading(doc: unknown) {
 const STORED = {
 	_id: userId,
 	login: { email: 'cliente@marketplace.test' },
-	personalData: { firstName: 'Mario', lastName: 'Rossi' },
-	addresses: [{ _id: addressId, street: 'via Roma 1', postalCode: '20100', city: 'Milano', province: 'MI' }],
+	personalData: { firstName: 'Mark', lastName: 'Rivers' },
+	addresses: [{ _id: addressId, street: '1 main street', postalCode: '02109', city: 'Boston', province: 'MA' }],
 	defaultAddress: addressId,
 	registeredAt
 }
@@ -49,7 +49,7 @@ describe('me', () => {
 		await expect(me.resolve(null, {}, ctx)).resolves.toEqual({
 			_id: userId,
 			email: 'cliente@marketplace.test',
-			personalData: { firstName: 'Mario', lastName: 'Rossi' },
+			personalData: { firstName: 'Mark', lastName: 'Rivers' },
 			addresses: STORED.addresses,
 			defaultAddress: addressId,
 			registeredAt

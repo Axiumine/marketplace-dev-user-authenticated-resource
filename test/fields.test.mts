@@ -9,8 +9,8 @@ import {
 	optionalEmail,
 	optionalText,
 	requiredText,
-	SHAPE_CAP,
 	SHAPE_EMAIL,
+	SHAPE_POSTAL_CODE,
 	SHAPE_PROVINCE,
 	textWithFormat
 } from '../src/lib/validate/fields.mts'
@@ -46,7 +46,7 @@ describe('bounds', () => {
 		expect(MAX_EMAIL).toBe(250)
 	})
 
-	it('is the Italian age of majority', () => {
+	it('is the age of majority', () => {
 		expect(MIN_AGE).toBe(18)
 	})
 })
@@ -63,22 +63,22 @@ describe('SHAPE_EMAIL', () => {
 	})
 })
 
-describe('SHAPE_CAP', () => {
+describe('SHAPE_POSTAL_CODE', () => {
 	it('accepts exactly 5 digits', () => {
-		expect(SHAPE_CAP.test('20100')).toBe(true)
+		expect(SHAPE_POSTAL_CODE.test('02109')).toBe(true)
 	})
 
-	// Anchored at both ends: without `^` a 4-digit CAP with a prefix would pass, without `$` a
+	// Anchored at both ends: without `^` a 4-digit postal code with a prefix would pass, without `$` a
 	// 6-digit one would, and both reach a validator that refuses them.
 	it.each(['2010', '201000', 'a2010', '20100 '])('rejects %s', (value) => {
-		expect(SHAPE_CAP.test(value)).toBe(false)
+		expect(SHAPE_POSTAL_CODE.test(value)).toBe(false)
 	})
 })
 
 describe('SHAPE_PROVINCE', () => {
 	// Both cases accepted on purpose — `validateUserAddress` upper-cases on the way in rather than
-	// refusing a lower-case sigla, which would be a validation error over something the server fixes.
-	it.each(['MI', 'mi', 'Mi'])('accepts %s', (value) => {
+	// refusing a lower-case province code, which would be a validation error over something the server fixes.
+	it.each(['MA', 'ma', 'Mi'])('accepts %s', (value) => {
 		expect(SHAPE_PROVINCE.test(value)).toBe(true)
 	})
 
@@ -89,7 +89,7 @@ describe('SHAPE_PROVINCE', () => {
 
 describe('requiredText', () => {
 	it('trims and returns the value', () => {
-		expect(requiredText('  via Roma 1  ', 'street', 250)).toBe('via Roma 1')
+		expect(requiredText('  1 main street  ', 'street', 250)).toBe('1 main street')
 	})
 
 	// The one place the whole envelope is pinned: a 400 titled 'Bad Request', with the field name in
@@ -153,13 +153,13 @@ describe('optionalText', () => {
 
 describe('textWithFormat', () => {
 	it('trims before matching, and answers the trimmed value', () => {
-		expect(textWithFormat('  20100 ', 'postalCode', SHAPE_CAP, 'the postal code is 5 digits')).toBe('20100')
+		expect(textWithFormat('  02109 ', 'postalCode', SHAPE_POSTAL_CODE, 'the postal code is 5 digits')).toBe('02109')
 	})
 
 	it('reports what was expected rather than what was received', () => {
-		expect(rejection(() => textWithFormat('2010', 'postalCode', SHAPE_CAP, 'the postal code is 5 digits')).description).toBe(
-			'postalCode: the postal code is 5 digits'
-		)
+		expect(
+			rejection(() => textWithFormat('2010', 'postalCode', SHAPE_POSTAL_CODE, 'the postal code is 5 digits')).description
+		).toBe('postalCode: the postal code is 5 digits')
 	})
 
 	// No separate emptiness test in the helper, deliberately: every SHAPE_* is anchored and matches

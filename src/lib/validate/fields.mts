@@ -6,7 +6,7 @@ import { throwErrorWrongUserInput } from '@axiumine/koa-utils/graphQL/throw/thro
  * They exist because the `user` collection's `$jsonSchema` is the only thing that would otherwise
  * enforce any of this, and a validator rejection surfaces as a raw driver error: `Document failed
  * validation`, with the offending path buried in `errInfo`. Apollo turns that into a 500 with no usable
- * message, so a customer who typed a four-digit CAP is told the server has broken. Every helper below
+ * message, so a customer who typed a four-digit postal code is told the server has broken. Every helper below
  * raises a 400 naming the field instead.
  *
  * They also **normalise**, and that half is not cosmetic. `additionalProperties: false` plus
@@ -15,7 +15,7 @@ import { throwErrorWrongUserInput } from '@axiumine/koa-utils/graphQL/throw/thro
  * blank, so the key is simply absent from the `$set` document.
  *
  * ⚠️ This is a **trimmed copy** of the admin service's `fields.mts`, not a shared module — there is no
- * shared validation library between the services. The slug, partita IVA, unique-code and exact-length
+ * shared validation library between the services. The slug, VAT number, unique-code and exact-length
  * helpers it also carries have no caller on this tier and were dropped rather than left dead: an
  * unreachable export still has to be covered, and the gate is at 100%. The bounds below are read off
  * `marketplace-db-setup/lib/schemas/user.js`, and where they coincide with the shop owner's it is
@@ -34,11 +34,11 @@ export const MAX_EMAIL = 250
  */
 export const SHAPE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export const SHAPE_CAP = /^\d{5}$/
+export const SHAPE_POSTAL_CODE = /^\d{5}$/
 export const SHAPE_PROVINCE = /^[A-Za-z]{2}$/
 
 /**
- * Italian age of majority.
+ * Age of majority.
  *
  * ⚠️ **A service-level rule, not a database one.** The `user` collection validator constrains
  * `personalData.birth.date` to a date and nothing more, so a document written by any other path is
