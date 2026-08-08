@@ -1,8 +1,8 @@
 import { tryCatchRethrow } from '@axiumine/koa-utils/lib/tryCatchRethrow'
+import { GraphQLInputUserPersonalData } from '@axiumine/marketplace-common/schema/GraphQLInput/GraphQLInputUserPersonalData'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
 import { funUserPersonalDataUpdate } from '@lib/user/funUserPersonalDataUpdate.mjs'
 import { IUserPersonalDataInput, validateUserPersonalData } from '@lib/validate/validateUserPersonalData.mjs'
-import { GraphQLInputUserPersonalData } from '@thedoctorweb_agency/marketplace-common/schema/GraphQLInput/GraphQLInputUserPersonalData'
 import { GraphQLBoolean, GraphQLError, GraphQLNonNull } from 'graphql'
 
 interface IArgs {

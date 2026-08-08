@@ -1,5 +1,5 @@
+import { IUserPersonalData } from '@axiumine/marketplace-common/models/MongoDBInterfaces/IUserPersonalData'
 import { birthDate, optionalEmail, optionalText, requiredText } from '@lib/validate/fields.mjs'
-import { IUserPersonalData } from '@thedoctorweb_agency/marketplace-common/models/MongoDBInterfaces/IUserPersonalData'
 
 /*
  * The `user` collection's own bounds, read off marketplace-db-setup/lib/schemas/user.js. Named rather

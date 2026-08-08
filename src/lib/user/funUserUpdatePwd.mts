@@ -4,8 +4,8 @@ import { throwUnauthorizedError } from '@axiumine/koa-utils/graphQL/throw/throwU
 import { checkPwdLen } from '@axiumine/koa-utils/lib/checkPwdLen'
 import { encryptPassword } from '@axiumine/koa-utils/lib/encryptPassword'
 import { compareHashAsync } from '@axiumine/koa-utils/lib/hash'
-import { User } from '@thedoctorweb_agency/marketplace-common/models/MongoDB/User'
-import { checkUserAuthorizationDisDel } from '@thedoctorweb_agency/marketplace-common/others/checkUserAuthorizationDisDel'
+import { User } from '@axiumine/marketplace-common/models/MongoDB/User'
+import { checkUserAuthorizationDisDel } from '@axiumine/marketplace-common/others/checkUserAuthorizationDisDel'
 import { Types } from 'mongoose'
 
 /**

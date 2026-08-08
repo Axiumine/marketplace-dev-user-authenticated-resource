@@ -1653,13 +1653,6 @@
     semver "^7.7.4"
     tslib "~2.8.0"
 
-"@thedoctorweb_agency/marketplace-common@^3.0.0":
-  version "3.0.0"
-  resolved "https://registry.npmjs.org/@thedoctorweb_agency/marketplace-common/-/marketplace-common-3.0.0.tgz#f78fb12e6d27b79cda5053f7667ed73d1e4e2ff1"
-  integrity sha512-lUXHzFqpDgTayoKv3MgoAAWeV6IRkSZzoTy50ldqVLINz+UrLRNeHl+ElETYhuCU4HJUywIn8pGz6flQnDujgg==
-  dependencies:
-    graphql-scalars "^1.25.0"
-
 "@tokenizer/inflate@^0.4.1":
   version "0.4.1"
   resolved "http://yarnproxy.gio.lan:4873/@tokenizer/inflate/-/inflate-0.4.1.tgz#fa6cdb8366151b3cc8426bf9755c1ea03a2fba08"

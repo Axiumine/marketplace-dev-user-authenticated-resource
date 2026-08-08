@@ -13,13 +13,7 @@ import { nodeNextResolver } from './vitest.shared.mts'
 // have to see the same transformed graphql copy as the sources. The bare /graphql/ pattern already
 // covers graphql-scalars and graphql-depth-limit, which build scalars and
 // validation rules from the same package.
-const inlineDeps = [
-	/graphql/,
-	/@apollo\/server/,
-	/@as-integrations/,
-	/@axiumine\/koa-utils/,
-	/@thedoctorweb_agency\/marketplace-common/
-]
+const inlineDeps = [/graphql/, /@apollo\/server/, /@as-integrations/, /@axiumine\/koa-utils/, /@axiumine\/marketplace-common/]
 
 // Two projects, one aggregated coverage report (must reach 100% — see COVERAGE.md):
 //   - unit:        MongoDB/Redis mocked, fast, no datasource needed.

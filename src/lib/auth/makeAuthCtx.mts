@@ -1,5 +1,5 @@
-import { IRedisDataUser } from '@thedoctorweb_agency/marketplace-common/others/Redis/IRedisDataUser'
-import { IRedisDataUserForNode } from '@thedoctorweb_agency/marketplace-common/others/Redis/IRedisDataUserForNode'
+import { IRedisDataUser } from '@axiumine/marketplace-common/others/Redis/IRedisDataUser'
+import { IRedisDataUserForNode } from '@axiumine/marketplace-common/others/Redis/IRedisDataUserForNode'
 import { Types } from 'mongoose'
 
 /**
