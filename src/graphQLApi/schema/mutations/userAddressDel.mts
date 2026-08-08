@@ -13,7 +13,7 @@ interface IArgs {
  * Removes one of the signed-in customer's addresses.
  *
  * ⚠️ **A hard delete, where `companyDel` is a soft one**, and the difference is not an inconsistency.
- * A company is a legal entity whose VAT number stays occupied after it stops trading, so the row has
+ * A company is a legal entity whose VAT number stays occupied after it stops trading, so the document has
  * to survive; an address is a line the customer typed and can retype, nothing references it but the
  * `defaultAddress` pointer, and keeping retired ones would mean every read path filtering an array in
  * application code.
