@@ -7,7 +7,7 @@ Tier/concern split, port table, terminology, auth model live there. Not here.
 
 | Need | File |
 |---|---|
-| what this svc is, suite shape, the two bugs it caught | [`README.md`](./README.md) |
+| what this svc is, suite shape | [`README.md`](./README.md) |
 | hook internals, gate order, node selection | [`REPO.md`](./REPO.md) |
 
 Token lifecycle → `marketplace-dev-user-authenticated-authorization` (4031). Logout →
@@ -55,8 +55,8 @@ setting the default is one `$set` with nothing to clear first, and **removing th
 unset the pointer in the same write**, which is why `funUserAddressDel` is an aggregation pipeline with
 `$$REMOVE` instead of a `$pull`.
 
-That pipeline is the only pipeline update in the workspace, and both of the bugs the integration project
-found on its first run were in it. Both are pinned in `userLib.test.mts` now:
+That pipeline is the only pipeline update in the workspace. Two traps in it, both pinned in
+`userLib.test.mts`:
 
 - **Mongoose 9 refuses an array update outright** unless `{ updatePipeline: true }` is passed —
   `Cannot pass an array to query updates unless the 'updatePipeline' option is set.`, thrown in
@@ -78,8 +78,8 @@ bypass in both directions and nothing tests the pairing.
 
 ## Tests
 
-Sixteen files, 309 tests, 100% on all four coverage metrics, mutation score 100 — eleven unit files (249
-tests) plus five `*.itest.mts` (60). What each integration file covers: [`README.md`](./README.md).
+100% on all four coverage metrics, mutation score 100. Unit files plus `*.itest.mts` integration files.
+What each integration file covers: [`README.md`](./README.md).
 
 Stryker runs the **unit project only** (`vitest.mutation.config.mts` narrows to `test/*.test.mts`),
 deliberately: mutating against real infrastructure would be slow and flaky.
