@@ -9,7 +9,7 @@ logout in `marketplace-dev-authenticated-logout` (4030), which all three tiers s
 The whole surface is one query and six mutations — `me`, a personal-data write, four address operations
 and a password change — and every one of them acts on the account the request is authenticated as. The
 operation table, and the four ways this service deliberately differs from its ShopOwner original, are in
-`CLAUDE.md`.
+[`CLAUDE.md`](./CLAUDE.md).
 
 ## The suite
 
@@ -28,7 +28,7 @@ It had been green by vacancy: vitest collects zero tests for a project with no m
 success, which reads exactly like a suite that ran. What it was not proving was the whole point of this
 service — `me`, the personal-data write, the address CRUD and the default-address pointer, all asserted
 against mocks and never against the real `$jsonSchema` or the real `$expr` that rejects a dangling
-`defaultAddress`. The two bugs themselves are recorded in `CLAUDE.md`, because each is a class of mistake
+`defaultAddress`. The two bugs themselves are recorded in [`CLAUDE.md`](./CLAUDE.md), because each is a class of mistake
 rather than a typo.
 
 ### The environment that blocked it
@@ -72,9 +72,9 @@ real socket with Mongo and Redis mocked. It is what keeps the coverage number ho
 
 | Topic | File |
 |---|---|
-| rules for agents working in this repo | `CLAUDE.md` |
-| git hooks, gate order, node selection | `REPO.md` |
-| the whole platform — tiers, ports, terminology | parent `CLAUDE.md` |
+| rules for agents working in this repo | [`CLAUDE.md`](./CLAUDE.md) |
+| git hooks, gate order, node selection | [`REPO.md`](./REPO.md) |
+| the whole platform — tiers, ports, terminology | parent [`CLAUDE.md`](./CLAUDE.md) |
 
 ## License
 

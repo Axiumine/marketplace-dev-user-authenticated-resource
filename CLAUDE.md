@@ -2,14 +2,13 @@
 
 Backend svc 9 of 9. User tier, resource concern. Port 4032, endpoint `/user-authenticated-resource`.
 
-**Read parent first** — `../../../CLAUDE.md`
-(<https://github.com/Axiumine/fullstack-marketplace-blueprint> if you are reading this on GitHub).
+**Read parent first** — [`../../../CLAUDE.md`](https://github.com/Axiumine/fullstack-marketplace-blueprint/blob/main/CLAUDE.md)
 Tier/concern split, port table, terminology, auth model live there. Not here.
 
 | Need | File |
 |---|---|
-| what this svc is, suite shape, the two bugs it caught | `README.md` |
-| hook internals, gate order, node selection | `REPO.md` |
+| what this svc is, suite shape, the two bugs it caught | [`README.md`](./README.md) |
+| hook internals, gate order, node selection | [`REPO.md`](./REPO.md) |
 
 Token lifecycle → `marketplace-dev-user-authenticated-authorization` (4031). Logout →
 `marketplace-dev-authenticated-logout` (4030), all three tiers.
@@ -80,7 +79,7 @@ bypass in both directions and nothing tests the pairing.
 ## Tests
 
 Sixteen files, 309 tests, 100% on all four coverage metrics, mutation score 100 — eleven unit files (249
-tests) plus five `*.itest.mts` (60). What each integration file covers: `README.md`.
+tests) plus five `*.itest.mts` (60). What each integration file covers: [`README.md`](./README.md).
 
 Stryker runs the **unit project only** (`vitest.mutation.config.mts` narrows to `test/*.test.mts`),
 deliberately: mutating against real infrastructure would be slow and flaky.
@@ -110,7 +109,7 @@ Two rules when adding a test:
 
 ## Gates
 
-commit → secret guard, lint, coverage, Qodana. push → same + mutation. All blocking. Why: `REPO.md`.
+commit → secret guard, lint, coverage, Qodana. push → same + mutation. All blocking. Why: [`REPO.md`](./REPO.md).
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
