@@ -5,7 +5,7 @@
     "type": "git",
     "url": "git+ssh://git@github.com/Marketplace-Org/marketplace-dev-user-authenticated-resource.git"
   },
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-or-later",
   "keywords": [],
   "scripts": {
     "lint": "eslint --fix . && prettier --write .",
