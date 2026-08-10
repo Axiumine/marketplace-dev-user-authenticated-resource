@@ -1,5 +1,5 @@
 import type { Next } from 'koa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
@@ -164,5 +164,53 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		const ctx = makeCtx({ authorization: `Bearer ${ACCESS}`, 'x-introspectioncode': 'test-introspection-code' })
 
 		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Forbidden')
+	})
+	/*
+	 * E13-S11. The bypass is a development convenience and outside `development` and `test` it does not
+	 * exist: the gate is read before the code is, so the configured value is never consulted and the
+	 * header is worth exactly what a header nobody sent is worth.
+	 */
+	describe('outside the environment allowlist', () => {
+		afterEach(() => {
+			vi.unstubAllEnvs()
+		})
+
+		/** The rejection flattened to what an HTTP client actually sees. */
+		const refusal = async (header?: Record<string, string>) => {
+			try {
+				await authorizationAuthenticatedResourceHandler()(makeCtx(header), next)
+			} catch (error) {
+				const { message, extensions } = error as { message: string; extensions: unknown }
+				return { message, extensions }
+			}
+			throw new Error('expected the handler to reject, and it returned')
+		}
+
+		// Every value below is admitted by the `NODE_ENV !== 'production'` form this gate replaced, and
+		// each is a shape a real deploy produces: a container runtime that exports nothing, a shell that
+		// exports an empty string, a capital letter, a staging box nobody ever classified.
+		it.each([['production'], ['staging'], ['Production'], [''], [undefined]])(
+			'refuses a valid x-introspectioncode under NODE_ENV=%o',
+			async (environment) => {
+				vi.stubEnv('NODE_ENV', environment)
+
+				const ctx = makeCtx({ 'x-introspectioncode': 'test-introspection-code' })
+
+				await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Precondition Failed')
+
+				expect(hGetAll).not.toHaveBeenCalled()
+				expect(ctx.state.user).toBeUndefined()
+				expect(next).not.toHaveBeenCalled()
+			}
+		)
+
+		// ⚠️ The refusal is the handler's own, down to the status and the description. A gate that threw
+		// something of its own would tell the caller that the code was right and only the environment
+		// wrong — which is the one thing the response must not distinguish.
+		it('refuses it with the error a request carrying no header at all gets', async () => {
+			vi.stubEnv('NODE_ENV', 'production')
+
+			expect(await refusal({ 'x-introspectioncode': 'test-introspection-code' })).toEqual(await refusal())
+		})
 	})
 })

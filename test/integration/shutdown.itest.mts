@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import net from 'node:net'
 
 import { MongoDBConnect, MongoDBDisconnect } from '@axiumine/koa-utils/dataSources/MongoDB'
 import { redisClient, RedisConnect } from '@axiumine/koa-utils/dataSources/Redis'
+import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import mongoose from 'mongoose'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -51,25 +53,35 @@ describe('production hardening actually applies to a real server', () => {
 	 * for its schema over real HTTP — a unit call to buildValidationRules() would only prove the array
 	 * was built, not that Apollo enforces it.
 	 *
-	 * Like the other resource services, this one gates every request behind
-	 * authorizationAuthenticatedResourceHandler BEFORE it reaches Apollo, so a bare request would be
-	 * refused at 412 and never touch the validation rules at all. The `x-introspectioncode` bypass —
-	 * already exercised in index.itest.mts — is what gets a request past that gate without needing a
-	 * Redis-backed session.
+	 * This service gates every request behind authorizationAuthenticatedResourceHandler BEFORE it
+	 * reaches Apollo, so a bare request is refused at 412 and never touches the validation rules at
+	 * all. This test used to get past that gate with the `x-introspectioncode` header; since E13-S11
+	 * that header does nothing outside `development` and `test`, and the whole point of booting this
+	 * server is that it is neither. So the request carries a real session instead — one access hash in
+	 * the live Redis, exactly as a logged-in caller would — which also makes the assertion stronger:
+	 * the introspection query is refused for an authenticated caller, not merely for an unauthenticated
+	 * one.
 	 */
 	it('refuses introspection when booted as production', async () => {
 		const realNodeEnv = process.env.NODE_ENV
 		process.env.NODE_ENV = 'production'
 
+		// A real access session, written the way a login writes one: the handler reads this hash,
+		// asserts the tier on it and builds ctx.state.user from it, with no MongoDB round-trip.
+		const accessToken = `access:${randomUUID()}`
+		const accessKey = `${process.env.REDIS_KEY}${accessToken}`
+
 		let server: Awaited<ReturnType<typeof createServer>> | undefined
 		try {
+			await redisClient.hSet(accessKey, { _id: new mongoose.Types.ObjectId().toHexString(), tier: TIER.user })
+
 			server = await createServer()
 			await new Promise<void>((resolve) => server!.httpServer.listen({ port: 0 }, () => resolve()))
 			const { port } = server.httpServer.address() as AddressInfo
 
 			const res = await fetch(`http://127.0.0.1:${port}${ENDPOINT}`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json', 'x-introspectioncode': process.env.INTROSPECTION_CODE! },
+				headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
 				body: JSON.stringify({ query: '{ __schema { queryType { name } } }' })
 			})
 			const json = (await res.json()) as { data?: unknown; errors?: Array<{ message: string }> }
@@ -78,6 +90,7 @@ describe('production hardening actually applies to a real server', () => {
 			expect(json.errors?.[0]?.message).toMatch(/introspection/i)
 		} finally {
 			process.env.NODE_ENV = realNodeEnv
+			await redisClient.del(accessKey)
 			if (server) {
 				await server.apolloServer.stop()
 				await new Promise<void>((resolve) => server!.httpServer.close(() => resolve()))

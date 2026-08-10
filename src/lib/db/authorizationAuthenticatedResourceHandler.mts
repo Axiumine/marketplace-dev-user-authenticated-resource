@@ -3,6 +3,7 @@ import { throwAccessTokenExpiredOrDeleted } from '@axiumine/koa-utils/graphQL/th
 import { throwAccessTokenRequired } from '@axiumine/koa-utils/graphQL/throw/throwAccessTokenRequired'
 import { throwPreconditionFailedNoAuthHeader } from '@axiumine/koa-utils/graphQL/throw/throwPreconditionFailedNoAuthHeader'
 import { assertTier } from '@axiumine/marketplace-common/others/assertTier'
+import { isIntrospectionBypassAllowed } from '@axiumine/marketplace-common/others/isIntrospectionBypassAllowed'
 import { IRedisDataUser } from '@axiumine/marketplace-common/others/Redis/IRedisDataUser'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
@@ -23,7 +24,13 @@ export const authorizationAuthenticatedResourceHandler = () => async (ctx: ICont
 	const authorization = ctx.request.header?.authorization // access
 	// more detailed errors code instead of generic 401 unauthorized (tampering)
 	if (typeof authorization === 'undefined') {
+		// ⚠️ The environment gate is evaluated **before** the code is read (E13-S11). Outside `development`
+		// and `test` the bypass does not exist at all, and a caller sending the correct header gets exactly
+		// the error a caller sending nothing gets — a wrong code and a disabled feature must not be
+		// distinguishable from the outside. `INTROSPECTION_CODE` stays in REQUIRED_ENV_VARS regardless:
+		// unset, it stringifies to the literal `'undefined'`, and that word would be the bypass.
 		if (
+			isIntrospectionBypassAllowed() &&
 			typeof ctx.request.header !== 'undefined' &&
 			ctx.request.header['x-introspectioncode'] === `${process.env.INTROSPECTION_CODE}`
 		) {
