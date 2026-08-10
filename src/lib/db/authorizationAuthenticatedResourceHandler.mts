@@ -6,6 +6,7 @@ import { assertTier } from '@axiumine/marketplace-common/others/assertTier'
 import { constantTimeEquals } from '@axiumine/marketplace-common/others/constantTimeEquals'
 import { isIntrospectionBypassAllowed } from '@axiumine/marketplace-common/others/isIntrospectionBypassAllowed'
 import { IRedisDataUser } from '@axiumine/marketplace-common/others/Redis/IRedisDataUser'
+import { readSessionHash } from '@axiumine/marketplace-common/others/sessionKeys'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
 import { makeAuthCtx } from '@lib/auth/makeAuthCtx.mjs'
@@ -56,8 +57,13 @@ export const authorizationAuthenticatedResourceHandler = () => async (ctx: ICont
 		// keeps its `access:` prefix after the replace, so the empty case is unreachable.
 		const accessToken = authorization!.replace('Bearer ', '')
 
-		const redAccessSession = await redisClient.hGetAll(`${process.env.REDIS_KEY}${accessToken}`) // 'access:' already present
-		if (redAccessSession != null && Object.keys(redAccessSession).length !== 0) {
+		// Keyed by the digest of the prefixed token, with a raw-key fallback for sessions minted before
+		// the cutover (E13-S01/S02). The `access:` prefix stays part of the hashed value: it is what
+		// tells an access hash from a refresh one, so it belongs inside the digest, not beside it.
+		const redAccessSession = await readSessionHash(redisClient, accessToken) // 'access:' already present
+		// `readSessionHash` normalises a missing or nullish reply to an empty hash, so this one test is
+		// the whole "is there a session" question — the `!= null` arm it replaces is now unreachable.
+		if (Object.keys(redAccessSession).length !== 0) {
 			const redData = { ...redAccessSession } as unknown as IRedisDataUser // For safety, Redis return an object without the default Object.prototype  in its prototype chain.
 			// The whole cross-tier boundary, in one call. All nine services read Redis under the same
 			// `REDIS_KEY` prefix, so an Admin or ShopOwner access token is *findable* here; without the

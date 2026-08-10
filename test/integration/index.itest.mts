@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { redisClient } from '@axiumine/koa-utils/dataSources/Redis'
+import { sessionKey } from '@axiumine/marketplace-common/others/sessionKeys'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import * as dotenv from 'dotenv'
 import type { Server } from 'http'
@@ -105,7 +106,10 @@ describe('bearer-token gate over HTTP', () => {
 	 */
 	it('answers 403 when the live session was minted for another tier', async () => {
 		const { _id } = await seedUser()
-		const key = `${REDIS_KEY}access:${randomUUID()}`
+		// The token first, the key from it — the key is a digest now (E13-S01) and no longer carries the
+		// token to slice back out of it.
+		const token = `access:${randomUUID()}`
+		const key = sessionKey(token)
 
 		try {
 			await redisClient.hSet(key, { _id: _id.toHexString(), email: 'oste@marketplace.test', tier: TIER.shopOwner })
@@ -113,7 +117,7 @@ describe('bearer-token gate over HTTP', () => {
 			// deliberately not one of them.
 			await redisClient.expire(key, 60)
 
-			const { status, json } = await gql(query, { authorization: `Bearer ${key.slice(REDIS_KEY.length)}` })
+			const { status, json } = await gql(query, { authorization: `Bearer ${token}` })
 
 			expect(status).toBe(403)
 			expect(json.message).toBe('Forbidden')
@@ -130,13 +134,16 @@ describe('bearer-token gate over HTTP', () => {
 	 */
 	it('answers 403 for a live session carrying no tier at all', async () => {
 		const { _id } = await seedUser()
-		const key = `${REDIS_KEY}access:${randomUUID()}`
+		// The token first, the key from it — the key is a digest now (E13-S01) and no longer carries the
+		// token to slice back out of it.
+		const token = `access:${randomUUID()}`
+		const key = sessionKey(token)
 
 		try {
 			await redisClient.hSet(key, { _id: _id.toHexString(), email: 'legacy@marketplace.test' })
 			await redisClient.expire(key, 60)
 
-			const { status, json } = await gql(query, { authorization: `Bearer ${key.slice(REDIS_KEY.length)}` })
+			const { status, json } = await gql(query, { authorization: `Bearer ${token}` })
 
 			expect(status).toBe(403)
 			expect(json.message).toBe('Forbidden')

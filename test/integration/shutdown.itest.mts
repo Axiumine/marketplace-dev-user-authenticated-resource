@@ -4,6 +4,7 @@ import net from 'node:net'
 
 import { MongoDBConnect, MongoDBDisconnect } from '@axiumine/koa-utils/dataSources/MongoDB'
 import { redisClient, RedisConnect } from '@axiumine/koa-utils/dataSources/Redis'
+import { sessionKey } from '@axiumine/marketplace-common/others/sessionKeys'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import mongoose from 'mongoose'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -69,7 +70,7 @@ describe('production hardening actually applies to a real server', () => {
 		// A real access session, written the way a login writes one: the handler reads this hash,
 		// asserts the tier on it and builds ctx.state.user from it, with no MongoDB round-trip.
 		const accessToken = `access:${randomUUID()}`
-		const accessKey = `${process.env.REDIS_KEY}${accessToken}`
+		const accessKey = sessionKey(accessToken)
 
 		let server: Awaited<ReturnType<typeof createServer>> | undefined
 		try {
