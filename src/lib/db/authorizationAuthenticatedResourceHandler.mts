@@ -3,6 +3,7 @@ import { throwAccessTokenExpiredOrDeleted } from '@axiumine/koa-utils/graphQL/th
 import { throwAccessTokenRequired } from '@axiumine/koa-utils/graphQL/throw/throwAccessTokenRequired'
 import { throwPreconditionFailedNoAuthHeader } from '@axiumine/koa-utils/graphQL/throw/throwPreconditionFailedNoAuthHeader'
 import { assertTier } from '@axiumine/marketplace-common/others/assertTier'
+import { constantTimeEquals } from '@axiumine/marketplace-common/others/constantTimeEquals'
 import { isIntrospectionBypassAllowed } from '@axiumine/marketplace-common/others/isIntrospectionBypassAllowed'
 import { IRedisDataUser } from '@axiumine/marketplace-common/others/Redis/IRedisDataUser'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
@@ -29,10 +30,13 @@ export const authorizationAuthenticatedResourceHandler = () => async (ctx: ICont
 		// the error a caller sending nothing gets — a wrong code and a disabled feature must not be
 		// distinguishable from the outside. `INTROSPECTION_CODE` stays in REQUIRED_ENV_VARS regardless:
 		// unset, it stringifies to the literal `'undefined'`, and that word would be the bypass.
+		//
+		// The comparison is `constantTimeEquals`, never `===` (E13-S03): string equality stops at the first
+		// differing character, and that gradient is a working oracle for the configured value.
 		if (
 			isIntrospectionBypassAllowed() &&
 			typeof ctx.request.header !== 'undefined' &&
-			ctx.request.header['x-introspectioncode'] === `${process.env.INTROSPECTION_CODE}`
+			constantTimeEquals(ctx.request.header['x-introspectioncode'], `${process.env.INTROSPECTION_CODE}`)
 		) {
 			introspection = true
 		} else {
