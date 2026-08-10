@@ -5,6 +5,7 @@ import { redisClient } from '@axiumine/koa-utils/dataSources/Redis'
 import { decryptDocument } from '@axiumine/marketplace-common/encryption/decryptDocument'
 import { encryptDocument } from '@axiumine/marketplace-common/encryption/encryptDocument'
 import { ENCRYPTED_FIELDS_USER, KEY_ALT_NAME_USER } from '@axiumine/marketplace-common/encryption/encryptedFields'
+import { sessionKey } from '@axiumine/marketplace-common/others/sessionKeys'
 import { TIER } from '@axiumine/marketplace-common/others/Tier'
 import * as dotenv from 'dotenv'
 import type { Server } from 'http'
@@ -176,7 +177,7 @@ export async function readUserEncrypted(_id: mongoose.Types.ObjectId) {
  */
 export async function withSession(_id = new mongoose.Types.ObjectId(), email = 'cliente@marketplace.test') {
 	const token = `access:${randomUUID()}`
-	const key = `${REDIS_KEY}${token}`
+	const key = sessionKey(token)
 
 	seededKeys.push(key)
 	// `tier` is what a real login writes and what this service asserts on every request: the auth
