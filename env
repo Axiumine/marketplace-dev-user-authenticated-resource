@@ -93,8 +93,7 @@ NODE_ENV=development
 #                                              no mail is sent here — registration, verification and
 #                                              password recovery all live on 4027
 #   REDIRECT_DOMAIN                            nothing redirects; this service answers GraphQL only
-#   SAMESITE_COOKIE / KEYGRIP_KEY_1 / KEYGRIP_KEY_2
-#                                              no cookie is signed or read here. The refresh cookie is
+#   SAMESITE_COOKIE / KEYGRIP_KEK              no cookie is signed or read here. The refresh cookie is
 #                                              minted and consumed by 4031; this tier reads the
 #                                              `Authorization: Bearer access:` header and nothing else
 #   HIT_STATS                                  unused
