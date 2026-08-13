@@ -5,13 +5,14 @@ import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContext
 
 const hKeys = vi.fn()
 const del = vi.fn()
+const hDel = vi.fn()
 
 /*
  * ⚠️ Only the client is faked. `revokeAllSessionsForAccount` and `deleteSession` run for real, so what
  * this suite asserts is the Redis conversation itself — the key shapes, their order and their count —
  * rather than that two mocks were called. A mocked helper would agree with a wrong key.
  */
-vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hKeys, del } }))
+vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hKeys, del, hDel } }))
 
 const { endEverySession } = await import('../src/lib/auth/endEverySession.mts')
 
@@ -47,6 +48,7 @@ beforeEach(() => {
 	vi.stubEnv('REDIS_KEY', REDIS_KEY)
 	hKeys.mockReset().mockResolvedValue(FIELDS)
 	del.mockReset().mockResolvedValue(1)
+	hDel.mockReset().mockResolvedValue(1)
 })
 
 afterEach(() => {
@@ -64,7 +66,9 @@ describe('endEverySession', () => {
 	it('revokes every session the account holds, the caller’s included', async () => {
 		await endEverySession(ctx())
 
-		expect(hKeys).toHaveBeenCalledExactlyOnceWith(`${REDIS_KEY}idx:user:${ACCOUNT_ID}`)
+		// Twice, both on the user index: the second is E17-S04's re-read, which is what licenses the delete of
+		// the index key at the end.
+		expect(hKeys.mock.calls).toEqual([[`${REDIS_KEY}idx:user:${ACCOUNT_ID}`], [`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]])
 		expect(del.mock.calls.map(([key]) => key)).toContain(`${REDIS_KEY}${CALLER_REFRESH_FIELD}`)
 		expect(del.mock.calls.slice(0, FIELDS.length).flat()).toEqual(FIELDS.map((field) => `${REDIS_KEY}${field}`))
 	})
@@ -107,6 +111,31 @@ describe('endEverySession', () => {
 		await endEverySession(ctx())
 
 		expect(del.mock.calls[FIELDS.length]).toEqual([`${REDIS_KEY}idx:user:${ACCOUNT_ID}`])
+	})
+
+	/*
+	 * ⚠️ **A login landing mid-revoke does not survive the teardown**, asserted at the call site rather than
+	 * left to the shared routine's own suite — this is the scenario the mutation exists for. The customer
+	 * changes their password because someone else is in the account, and that someone logs in again between
+	 * the index read and its delete. E17-S04's re-read ends the second session too, and the index key
+	 * survives until it has: deleting it there would leave a live session nothing could name.
+	 */
+	it('revokes a session that appeared during the revoke, and keeps the index until it has', async () => {
+		const NEWCOMER = 'd'.repeat(64)
+
+		hKeys
+			.mockResolvedValueOnce(FIELDS)
+			.mockResolvedValueOnce([...FIELDS, NEWCOMER])
+			.mockResolvedValueOnce([...FIELDS, NEWCOMER])
+
+		await endEverySession(ctx())
+
+		expect(del.mock.calls.slice(0, FIELDS.length + 2)).toEqual([
+			...FIELDS.map((field) => [`${REDIS_KEY}${field}`]),
+			[`${REDIS_KEY}${NEWCOMER}`],
+			[`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]
+		])
+		expect(hDel.mock.calls).toEqual(FIELDS.map((field) => [`${REDIS_KEY}idx:user:${ACCOUNT_ID}`, field]))
 	})
 
 	/*
