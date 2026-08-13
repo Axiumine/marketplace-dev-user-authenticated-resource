@@ -31,6 +31,10 @@ export const ENDPOINT = '/user-authenticated-resource'
  * redirects; this tier answers GraphQL only), `SAMESITE_COOKIE` (no cookie is set — the refresh cookie
  * belongs to 4031) and `HIT_STATS`.
  *
+ * Three of those reasons were understated: `REDIRECT_DOMAIN`, `SAMESITE_COOKIE` and `HIT_STATS` are read
+ * by nothing on this platform at all, not merely by nothing here, and E18-S13 removed them from the two
+ * lists that still carried them and from all nine `env` templates.
+ *
  * `INTROSPECTION_CODE` stays: `authorizationAuthenticatedResourceHandler` compares against it, and an
  * unset one would make the comparison `'undefined' === 'undefined'` for any caller sending that
  * literal string.
