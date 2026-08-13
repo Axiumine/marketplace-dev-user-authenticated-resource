@@ -98,6 +98,13 @@ NODE_ENV=development
 #                                              `Authorization: Bearer access:` header and nothing else
 #   HIT_STATS                                  unused
 #
+# ⚠️ Three of those reasons turned out to be platform-wide rather than tier-specific: REDIRECT_DOMAIN,
+# SAMESITE_COOKIE and HIT_STATS are read by no `src/` file in any of the nine services and by no
+# `dist/` file in either @axiumine package, so E18-S13 took them out of the other eight templates too.
+# SAMESITE_COOKIE in particular never set the refresh cookie's SameSite attribute anywhere — that is
+# the literal `sameSite: 'Strict'` in @axiumine/koa-utils/dist/lib/tokenOptions.mjs. This file was
+# right about all three before the rest of the platform was.
+#
 # Everything below IS read. `checkRequiredEnv()` in src/index.mts refuses to start without it.
 
 # Shared with all nine services on purpose — it is what lets the single logout service (4030) delete a
