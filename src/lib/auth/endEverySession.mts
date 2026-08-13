@@ -22,11 +22,13 @@ import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthent
  * string this account's index cannot name. The reverse order leaves the refresh sessions alive, which
  * is the whole attack: the intruder simply refreshes and gets another access token.
  *
- * ⚠️ **Only the caller's access key can be deleted here, and that is a limit rather than an oversight.**
- * The index files refresh sessions alone (`indexSession`), so the other devices' access tokens keep
- * working until they expire on their own — minutes, and the same residual the `disabled` flag has
- * always carried. Shortening it needs an access-token deny list, which this platform has deliberately
- * not built.
+ * ⚠️ **Every device's access token goes too, and the call above is what ends it** (R54, 2026-08-13). The
+ * index still files refresh sessions alone (`indexSession`), but each of those hashes now records the key
+ * of the access session it minted, so `revokeAllSessionsForAccount` retires both halves of every session
+ * it revokes. Until it did, this function ended the caller's access token and left every other device's
+ * working for up to 91 minutes. The explicit delete below is therefore no longer the only thing closing
+ * that window — it is the floor under it: a session minted before the field existed carries no bound key,
+ * and a token from before E13's cutover lives under a key shape the field never held.
  *
  * The missing-header branch is the introspection bypass, which reaches a resolver with no session at
  * all: there is no caller to log out, so there is no key to delete.

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
 const hKeys = vi.fn()
+const hGet = vi.fn()
 const del = vi.fn()
 const hDel = vi.fn()
 
@@ -12,7 +13,7 @@ const hDel = vi.fn()
  * this suite asserts is the Redis conversation itself — the key shapes, their order and their count —
  * rather than that two mocks were called. A mocked helper would agree with a wrong key.
  */
-vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hKeys, del, hDel } }))
+vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hKeys, hGet, del, hDel } }))
 
 const { endEverySession } = await import('../src/lib/auth/endEverySession.mts')
 
@@ -23,6 +24,15 @@ const ACCOUNT_ID = '507f1f77bcf86cd799439011'
 // the body of each refresh session's key, and this service never sees a refresh token to derive one from.
 const CALLER_REFRESH_FIELD = 'a'.repeat(64)
 const FIELDS = [CALLER_REFRESH_FIELD, 'b'.repeat(64), 'c'.repeat(64)]
+
+/*
+ * Each refresh session names the access session it minted, in its own `accessKey` field (R54). The stub
+ * answers the session key upper-cased, which is not a key shape the platform ever writes and is exactly
+ * why it is used here: a `del` of one of these can only have come from reading the field, never from the
+ * routine deriving a key from the field it already had.
+ */
+const accessKeyOf = (sessionKey: string) => sessionKey.toUpperCase()
+const SESSION_KEYS = FIELDS.map((field) => `${REDIS_KEY}${field}`)
 
 // The access token the mutation arrived with, and the digest of it written out as a literal — computed
 // elsewhere, because a test that hashed it with the same call the implementation makes would agree with
@@ -47,6 +57,7 @@ const ctxWithoutHeaders = () =>
 beforeEach(() => {
 	vi.stubEnv('REDIS_KEY', REDIS_KEY)
 	hKeys.mockReset().mockResolvedValue(FIELDS)
+	hGet.mockReset().mockImplementation((key: string) => Promise.resolve(accessKeyOf(key)))
 	del.mockReset().mockResolvedValue(1)
 	hDel.mockReset().mockResolvedValue(1)
 })
@@ -70,7 +81,34 @@ describe('endEverySession', () => {
 		// the index key at the end.
 		expect(hKeys.mock.calls).toEqual([[`${REDIS_KEY}idx:user:${ACCOUNT_ID}`], [`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]])
 		expect(del.mock.calls.map(([key]) => key)).toContain(`${REDIS_KEY}${CALLER_REFRESH_FIELD}`)
-		expect(del.mock.calls.slice(0, FIELDS.length).flat()).toEqual(FIELDS.map((field) => `${REDIS_KEY}${field}`))
+		expect(del.mock.calls.slice(FIELDS.length, FIELDS.length * 2).flat()).toEqual(SESSION_KEYS)
+	})
+
+	/*
+	 * ⚠️ **Every session's access token is ended, not only the caller's** (R54, 2026-08-13). This is the
+	 * assertion that says the other devices stop working now rather than in up to 91 minutes: the routine
+	 * reads each session's `accessKey` field and deletes the key it names, and it does so while the hash is
+	 * still there — a read after the `del` would answer nothing and leave the access half orphaned.
+	 */
+	it('ends the access half of every session, before the session that names it', async () => {
+		await endEverySession(ctx())
+
+		expect(hGet.mock.calls).toEqual(SESSION_KEYS.map((key) => [key, 'accessKey']))
+		expect(del.mock.calls.slice(0, FIELDS.length).flat()).toEqual(SESSION_KEYS.map(accessKeyOf))
+	})
+
+	/*
+	 * A session hash minted before the field existed carries no `accessKey`, and one that expired between
+	 * the index read and its own `del` carries nothing at all. Both answer `null`, and neither may stop the
+	 * revocation: the pre-R54 behaviour is the floor here, never the outcome of a failed read.
+	 */
+	it('revokes sessions that name no access key, and deletes no key for them', async () => {
+		hGet.mockResolvedValue(null)
+
+		await endEverySession(ctx())
+
+		expect(del.mock.calls.slice(0, FIELDS.length).flat()).toEqual(SESSION_KEYS)
+		expect(del.mock.calls[FIELDS.length]).toEqual([`${REDIS_KEY}idx:user:${ACCOUNT_ID}`])
 	})
 
 	/*
@@ -90,10 +128,11 @@ describe('endEverySession', () => {
 	})
 
 	/*
-	 * ⚠️ **Refresh sessions first, the access key second.** A failure between the two must leave the smaller
-	 * residue: the caller's access token alive for the minutes it has left, which every other device already
-	 * carries anyway. Reversed, the refresh sessions survive — and refreshing one is how the intruder gets
-	 * another access token.
+	 * ⚠️ **Refresh sessions first, the caller's own access key second.** A failure between the two must leave
+	 * the smaller residue: an access token alive for the minutes it has left. Reversed, the refresh sessions
+	 * survive — and refreshing one is how the intruder gets another access token. This is the *outer* order,
+	 * and deliberately the opposite of the order inside the revocation, where each session's access half is
+	 * read out of the hash before that hash is deleted (R54) — afterwards the read finds nothing.
 	 */
 	it('ends the refresh sessions before the caller’s access key', async () => {
 		await endEverySession(ctx())
@@ -102,7 +141,7 @@ describe('endEverySession', () => {
 			.map(([key], index) => ({ key, index }))
 			.filter(({ key }) => key === `${REDIS_KEY}${ACCESS_DIGEST}` || key === `${REDIS_KEY}${ACCESS_TOKEN}`)
 
-		expect(Math.min(...accessDeletes.map(({ index }) => index))).toBeGreaterThan(FIELDS.length - 1)
+		expect(Math.min(...accessDeletes.map(({ index }) => index))).toBeGreaterThan(FIELDS.length * 2 - 1)
 	})
 
 	// The index key is deleted last of the account's own keys, which is what makes an interrupted revocation
@@ -110,7 +149,7 @@ describe('endEverySession', () => {
 	it('deletes the account index after the sessions it names', async () => {
 		await endEverySession(ctx())
 
-		expect(del.mock.calls[FIELDS.length]).toEqual([`${REDIS_KEY}idx:user:${ACCOUNT_ID}`])
+		expect(del.mock.calls[FIELDS.length * 2]).toEqual([`${REDIS_KEY}idx:user:${ACCOUNT_ID}`])
 	})
 
 	/*
@@ -130,8 +169,12 @@ describe('endEverySession', () => {
 
 		await endEverySession(ctx())
 
-		expect(del.mock.calls.slice(0, FIELDS.length + 2)).toEqual([
-			...FIELDS.map((field) => [`${REDIS_KEY}${field}`]),
+		// Two rounds, each one its access halves first and its refresh keys second, then the index key: the
+		// newcomer's own access token goes too, which is what makes the re-read a revocation and not a tidy-up.
+		expect(del.mock.calls.slice(0, FIELDS.length * 2 + 3)).toEqual([
+			...SESSION_KEYS.map((key) => [accessKeyOf(key)]),
+			...SESSION_KEYS.map((key) => [key]),
+			[accessKeyOf(`${REDIS_KEY}${NEWCOMER}`)],
 			[`${REDIS_KEY}${NEWCOMER}`],
 			[`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]
 		])
@@ -147,7 +190,7 @@ describe('endEverySession', () => {
 	it('deletes no access key when the request carried no Authorization header', async () => {
 		await endEverySession(ctx({}))
 
-		expect(del).toHaveBeenCalledTimes(FIELDS.length + 1)
+		expect(del).toHaveBeenCalledTimes(FIELDS.length * 2 + 1)
 		expect(del.mock.calls.map(([key]) => key)).not.toContain(`${REDIS_KEY}${ACCESS_DIGEST}`)
 	})
 
@@ -161,7 +204,11 @@ describe('endEverySession', () => {
 	it('revokes the account’s sessions when the request carried no headers at all', async () => {
 		await expect(endEverySession(ctxWithoutHeaders())).resolves.toBeUndefined()
 
-		expect(del.mock.calls).toEqual([...FIELDS.map((field) => [`${REDIS_KEY}${field}`]), [`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]])
+		expect(del.mock.calls).toEqual([
+			...SESSION_KEYS.map((key) => [accessKeyOf(key)]),
+			...SESSION_KEYS.map((key) => [key]),
+			[`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]
+		])
 	})
 
 	// An account whose sessions have all expired revokes quietly: `hKeys` on a missing key answers an empty
