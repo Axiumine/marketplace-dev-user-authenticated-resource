@@ -36,6 +36,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		next = vi.fn().mockResolvedValue('next') as unknown as Next
 	})
 
+	// AB-01: a valid credential is accepted and the session it resolves reaches ctx.state.user
 	it('builds state.user from the Redis session', async () => {
 		hGetAll.mockResolvedValueOnce(redisSession())
 
@@ -82,6 +83,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 	// token content alone — so a ShopOwner access token is *findable* here and, before the tier
 	// existed, was simply accepted: its `_id` reached the customer resolvers, which then read and
 	// wrote whatever `user` document happened to share that id.
+	// AB-02: a session minted for another tier is refused with 403, not 401
 	it.each([['shopOwner'], ['admin']])('refuses a session minted for the %s tier with a 403', async (tier) => {
 		hGetAll.mockResolvedValueOnce(redisSession({ tier }))
 
@@ -95,6 +97,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 	// Fail closed. A session predating the discriminator carries no tier and is refused by
 	// `actual !== expected` with no branch of its own — treating it as a wildcard would have kept the
 	// hole open for the whole 90-day refresh lifetime, and costs those sessions one re-login to close.
+	// AB-03: a session carrying no tier at all is refused — fail closed, never a wildcard
 	it('refuses a session with no tier at all', async () => {
 		const session = redisSession()
 		delete session.tier
@@ -121,6 +124,8 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		}
 	})
 
+	// AB-04: a request carrying no credential is refused
+	// AB-10: no x-introspectioncode at all leaves the ordinary refusal exactly as it is
 	it('answers 412 when there is no authorization header', async () => {
 		const ctx = makeCtx({})
 
@@ -137,6 +142,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Precondition Failed')
 	})
 
+	// AB-05: a credential of the wrong shape is refused — a bad scheme, a broken signature
 	it('answers 499 when the header does not use the `Bearer access:` scheme', async () => {
 		const ctx = makeCtx({ authorization: `Bearer ${OID}` })
 
@@ -144,6 +150,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		expect(hGetAll).not.toHaveBeenCalled()
 	})
 
+	// AB-06: a credential whose session is gone from Redis is refused
 	it('answers 498 when the session is gone from Redis', async () => {
 		hGetAll.mockResolvedValueOnce({})
 
@@ -164,6 +171,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 	// Service-to-service calls: the code stands in for the whole bearer flow, so no Redis lookup
 	// happens and state.user is never populated. Resolvers that need ctx.state.user must not be
 	// called this way — introspection is what this is for.
+	// AB-08: a valid x-introspectioncode is accepted with no credential at all, and reads no session
 	it('lets a valid x-introspectioncode through with no authorization header', async () => {
 		const ctx = makeCtx({ 'x-introspectioncode': 'test-introspection-code' })
 
@@ -174,6 +182,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		expect(next).toHaveBeenCalledTimes(1)
 	})
 
+	// AB-09: a wrong x-introspectioncode is refused
 	it('ignores a wrong x-introspectioncode', async () => {
 		const ctx = makeCtx({ 'x-introspectioncode': 'wrong-code' })
 
@@ -222,6 +231,7 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		// Every value below is admitted by the `NODE_ENV !== 'production'` form this gate replaced, and
 		// each is a shape a real deploy produces: a container runtime that exports nothing, a shell that
 		// exports an empty string, a capital letter, a staging box nobody ever classified.
+		// AB-11: a valid x-introspectioncode is refused outside the environment allowlist, indistinguishably from none
 		it.each([['production'], ['staging'], ['Production'], [''], [undefined]])(
 			'refuses a valid x-introspectioncode under NODE_ENV=%o',
 			async (environment) => {
