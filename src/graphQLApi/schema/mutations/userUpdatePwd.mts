@@ -1,4 +1,5 @@
 import { tryCatchRethrow } from '@axiumine/koa-utils/lib/tryCatchRethrow'
+import { endEverySession } from '@lib/auth/endEverySession.mjs'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
 import { funUserUpdatePwd } from '@lib/user/funUserUpdatePwd.mjs'
 import { GraphQLBoolean, GraphQLError, GraphQLNonNull, GraphQLString } from 'graphql'
@@ -25,6 +26,13 @@ export const userUpdatePwd = {
 	async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
 		try {
 			await funUserUpdatePwd(ctx.state.user._id, args.passwordOld, args.passwordNew)
+
+			// ⚠️ **After the write and inside the try, both deliberately** (E15-S05). Before it, a password
+			// change that then failed validation would have logged the customer out of every device for
+			// nothing. Outside it, a Redis that refused would leave this answering `true` with every stolen
+			// session still live — which is the exact lie this story exists to stop telling. The caller's own
+			// session goes too, so the next request they make is refused and they log in again.
+			await endEverySession(ctx)
 		} catch (e) {
 			tryCatchRethrow(e as GraphQLError | Error)
 		}

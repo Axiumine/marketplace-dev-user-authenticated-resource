@@ -12,6 +12,7 @@ const funUserPersonalDataUpdate = vi.fn()
 const funUserUpdatePwd = vi.fn()
 const throwIfUserDontOwnAddress = vi.fn()
 const captureException = vi.fn()
+const endEverySession = vi.fn()
 
 vi.mock('@lib/user/funUserAddressAdd.mjs', () => ({ funUserAddressAdd }))
 vi.mock('@lib/user/funUserAddressDel.mjs', () => ({ funUserAddressDel }))
@@ -20,6 +21,7 @@ vi.mock('@lib/user/funUserDefaultAddressSet.mjs', () => ({ funUserDefaultAddress
 vi.mock('@lib/user/funUserPersonalDataUpdate.mjs', () => ({ funUserPersonalDataUpdate }))
 vi.mock('@lib/user/funUserUpdatePwd.mjs', () => ({ funUserUpdatePwd }))
 vi.mock('@lib/user/throwIfUserDontOwnAddress.mjs', () => ({ throwIfUserDontOwnAddress }))
+vi.mock('@lib/auth/endEverySession.mjs', () => ({ endEverySession }))
 // The plain-Error arm of tryCatchRethrow reports before it rethrows; Sentry is never initialised in
 // the unit project, so this is both a stub and the assertion target for that arm.
 vi.mock('@sentry/node', () => ({ captureException }))
@@ -61,6 +63,7 @@ beforeEach(() => {
 	funUserUpdatePwd.mockReset().mockResolvedValue(undefined)
 	throwIfUserDontOwnAddress.mockReset().mockResolvedValue(undefined)
 	captureException.mockReset()
+	endEverySession.mockReset().mockResolvedValue(undefined)
 })
 
 describe('userAddressAdd', () => {
@@ -249,6 +252,49 @@ describe('userUpdatePwd', () => {
 		)
 
 		expect(funUserUpdatePwd).toHaveBeenCalledExactlyOnceWith(userId, 'old-password', 'new-password')
+	})
+
+	/*
+	 * ⚠️ **Every session ends, and only after the write landed** (E15-S05). A password change made because
+	 * someone else is believed to be inside the account is the remedy it appears to be only if the
+	 * intruder's session dies with it — and the order is the other half: revoking first would log a
+	 * customer out of every device for a change that then failed validation.
+	 */
+	it('ends every session the account holds, after the password write', async () => {
+		await expect(userUpdatePwd.resolve(null, { passwordOld: 'old-password', passwordNew: 'new-password' }, ctx)).resolves.toBe(
+			true
+		)
+
+		expect(endEverySession).toHaveBeenCalledExactlyOnceWith(ctx)
+		expect(endEverySession.mock.invocationCallOrder[0]).toBeGreaterThan(funUserUpdatePwd.mock.invocationCallOrder[0])
+	})
+
+	// The revoke is not attempted when the write did not happen. A wrong current password answers 401 and
+	// must not, on its way out, log the customer out of the devices they are legitimately using.
+	it('revokes nothing when the password write failed', async () => {
+		funUserUpdatePwd.mockRejectedValueOnce(
+			new GraphQLError('Unauthorized', { extensions: { http: { status: 401 }, description: 'wrong password' } })
+		)
+
+		await rejection(userUpdatePwd.resolve(null, { passwordOld: 'wrong', passwordNew: 'new-password' }, ctx))
+
+		expect(endEverySession).not.toHaveBeenCalled()
+	})
+
+	/*
+	 * ⚠️ **A revoke that fails fails the mutation.** The alternative — answering `true` and reporting the
+	 * Redis error somewhere else — tells the customer their password change ended every other session when
+	 * it did not, which is worse than an error they can retry.
+	 */
+	it('fails loudly when the sessions cannot be ended, rather than answering true', async () => {
+		endEverySession.mockRejectedValueOnce(new Error('redis down'))
+
+		expect(
+			await rejection(userUpdatePwd.resolve(null, { passwordOld: 'old-password', passwordNew: 'new-password' }, ctx))
+		).toEqual({
+			title: 'Internal Server Error',
+			status: 500
+		})
 	})
 
 	// A GraphQLError keeps its own status through tryCatchRethrow — the 401 a wrong current password
