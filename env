@@ -88,7 +88,7 @@ NODE_ENV=development
 # this file is the only place the intended variable set is written down, so a leftover here reads as a
 # dependency the service does not have. Gone, with the reason:
 #
-#   UPLOAD_DIR / MAX_IMAGE_MB / MAX_VIDEO_MB   nothing is uploaded on this tier; no sharp, no clamscan
+#   UPLOAD_DIR   nothing is uploaded on this tier; no sharp, no clamscan
 #   SOCKETLABS_* / EMAIL_FROM / DEV_TEAM_EMAIL / PLATFORM_NAME
 #                                              no mail is sent here — registration, verification and
 #                                              password recovery all live on 4027
