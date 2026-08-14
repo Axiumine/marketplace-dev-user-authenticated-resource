@@ -27,8 +27,7 @@ import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthent
  * of the access session it minted, so `revokeAllSessionsForAccount` retires both halves of every session
  * it revokes. Until it did, this function ended the caller's access token and left every other device's
  * working for up to 91 minutes. The explicit delete below is therefore no longer the only thing closing
- * that window — it is the floor under it: a session minted before the field existed carries no bound key,
- * and a token from before E13's cutover lives under a key shape the field never held.
+ * that window — it is the floor under it: a session minted before the field existed carries no bound key.
  *
  * The missing-header branch is the introspection bypass, which reaches a resolver with no session at
  * all: there is no caller to log out, so there is no key to delete.

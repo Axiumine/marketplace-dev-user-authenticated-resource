@@ -115,15 +115,16 @@ describe('endEverySession', () => {
 	 * ⚠️ **Both of the caller's keys, not only the refresh one.** A revoke that dropped the refresh session
 	 * alone would leave the caller — and therefore an attacker who has just been handed the new password —
 	 * working until the access token expired on its own, which is exactly the window the change was made to
-	 * close. Both shapes go, because a session minted before E13's cutover lives under the raw token.
+	 * close. One key shape, since E13-S10: the raw-token shape this used to delete alongside the digest is
+	 * unwritable and unreadable, so deleting it would be a round trip against a key that cannot exist.
 	 */
-	it('deletes the caller’s access session, in both key shapes', async () => {
+	it('deletes the caller’s access session, under the digest and not under the token', async () => {
 		await endEverySession(ctx())
 
 		const keys = del.mock.calls.map(([key]) => key)
 
 		expect(keys).toContain(`${REDIS_KEY}${ACCESS_DIGEST}`)
-		expect(keys).toContain(`${REDIS_KEY}${ACCESS_TOKEN}`)
+		expect(keys).not.toContain(`${REDIS_KEY}${ACCESS_TOKEN}`)
 		expect(del.mock.calls.every((call) => call.length === 1)).toBe(true)
 	})
 
@@ -212,12 +213,13 @@ describe('endEverySession', () => {
 	})
 
 	// An account whose sessions have all expired revokes quietly: `hKeys` on a missing key answers an empty
-	// array, and there is then nothing to delete but the caller's own access key.
+	// array, and there is then nothing to delete but the caller's own access key — one key, under its digest,
+	// since E13-S10 dropped the second delete that named the raw token.
 	it('still ends the caller’s access session when the index is empty', async () => {
 		hKeys.mockResolvedValueOnce([])
 
 		await endEverySession(ctx())
 
-		expect(del.mock.calls).toEqual([[`${REDIS_KEY}${ACCESS_DIGEST}`], [`${REDIS_KEY}${ACCESS_TOKEN}`]])
+		expect(del).toHaveBeenCalledExactlyOnceWith(`${REDIS_KEY}${ACCESS_DIGEST}`)
 	})
 })

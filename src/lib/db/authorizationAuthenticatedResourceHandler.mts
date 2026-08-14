@@ -57,9 +57,9 @@ export const authorizationAuthenticatedResourceHandler = () => async (ctx: ICont
 		// keeps its `access:` prefix after the replace, so the empty case is unreachable.
 		const accessToken = authorization!.replace('Bearer ', '')
 
-		// Keyed by the digest of the prefixed token, with a raw-key fallback for sessions minted before
-		// the cutover (E13-S01/S02). The `access:` prefix stays part of the hashed value: it is what
-		// tells an access hash from a refresh one, so it belongs inside the digest, not beside it.
+		// Keyed by the digest of the prefixed token, and by nothing else since E13-S10 removed the raw-key
+		// fallback. The `access:` prefix stays part of the hashed value: it is what tells an access hash from
+		// a refresh one, so it belongs inside the digest, not beside it.
 		const redAccessSession = await readSessionHash(redisClient, accessToken) // 'access:' already present
 		// `readSessionHash` normalises a missing or nullish reply to an empty hash, so this one test is
 		// the whole "is there a session" question — the `!= null` arm it replaces is now unreachable.

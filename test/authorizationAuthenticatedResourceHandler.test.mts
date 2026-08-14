@@ -4,11 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
 const hGetAll = vi.fn()
-// `incr` is the dual-read counter (E13-S02). It is only touched when a read misses the hashed key and
-// finds a raw one, so every other test in this file asserts it was *not* called.
-const incr = vi.fn()
-
-vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hGetAll, incr } }))
+vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hGetAll } }))
 
 const { authorizationAuthenticatedResourceHandler } = await import('../src/lib/db/authorizationAuthenticatedResourceHandler.mts')
 
@@ -32,7 +28,6 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 
 	beforeEach(() => {
 		hGetAll.mockReset()
-		incr.mockReset().mockResolvedValue(1)
 		next = vi.fn().mockResolvedValue('next') as unknown as Next
 	})
 
@@ -50,32 +45,30 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		// about any algorithm, including a mutated one.
 		expect(hGetAll).toHaveBeenCalledExactlyOnceWith(HASHED_KEY)
 		expect(HASHED_KEY).not.toContain(ACCESS)
-		expect(incr).not.toHaveBeenCalled()
 		expect(String(ctx.state.user._id)).toBe(OID)
 		expect(ctx.state.user.email).toBe('cliente@marketplace.test')
 		expect(next).toHaveBeenCalledTimes(1)
 	})
 
 	/*
-	 * ⚠️ The cutover deploy, in one test. Every session already in Redis when this ships lives under the
-	 * raw key and every request arriving asks for the hashed one; without the fallback read the two never
-	 * meet and the platform logs out every customer at the same second.
+	 * ⚠️ **The inverted E13-S02 test** (E13-S10). The fixture is the one that used to prove the cutover was
+	 * survivable — a perfectly valid session sitting under the raw-token key — and the expected answer is
+	 * now 498, because this handler names that key nowhere.
 	 *
-	 * Order is asserted, not just the pair: hashed first, raw second. Reversed, every request would pay a
-	 * miss on the shape that is draining rather than on the one that is filling.
-	 *
-	 * ⚠️ E13-S10 deletes the fallback and this test with it, once `dual-read-hits` has sat at zero.
+	 * Kept rather than deleted, because what needs asserting is not "the fallback left the source" but
+	 * "the raw key is unreachable from here": one `hGetAll`, for the digest, and no second read of any
+	 * shape. A reintroduced fallback fails on the call list even if it were spelled differently.
 	 */
-	it('still finds a session written before the cutover, under the raw key', async () => {
+	it('refuses a session written under the raw key, and never reads that key', async () => {
 		hGetAll.mockResolvedValueOnce({}).mockResolvedValueOnce(redisSession())
 
 		const ctx = makeCtx({ authorization: `Bearer ${ACCESS}` })
 
-		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).resolves.toBe('next')
+		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Invalid Token')
 
-		expect(hGetAll.mock.calls).toEqual([[HASHED_KEY], [RAW_KEY]])
-		expect(incr).toHaveBeenCalledExactlyOnceWith('test:dual-read-hits')
-		expect(String(ctx.state.user._id)).toBe(OID)
+		expect(hGetAll).toHaveBeenCalledExactlyOnceWith(HASHED_KEY)
+		expect(hGetAll.mock.calls.flat()).not.toContain(RAW_KEY)
+		expect(next).not.toHaveBeenCalled()
 	})
 
 	// ⚠️ The whole cross-tier boundary is this one assertion. All nine services read Redis under the
