@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 dotenv.config()
 
-import { bootServer, db, drainAndClose, gql, readUser, seedUser, withSignedInUser } from './harness.mts'
+import { bootServer, db, drainAndClose, gql, readUser, readUserEncrypted, seedUser, withSignedInUser } from './harness.mts'
 
 /****************************************************************************************
  * The address surface, against the real collection validator.
@@ -118,6 +118,31 @@ describe('userAddressAdd', () => {
 				first.toHexString(),
 				second.toHexString()
 			])
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	// ⚠️ Six, and the seventh is refused by the same `updateOne` that would have written it — the cap is
+	// a clause of the filter, not a count taken first. The 400 carries the number, because a limit the
+	// customer cannot see is a refusal they cannot act on. That MongoDB refuses a seventh element
+	// whatever this service says is proved with the raw driver further down.
+	it('accepts six addresses and refuses the seventh with a 400 naming the limit', async () => {
+		const user = await withSignedInUser()
+
+		try {
+			for (let i = 0; i < 6; i++) {
+				await addAddress(user.headers)
+			}
+
+			const seventh = await gql(ADD(), user.headers)
+
+			expect(seventh.status).toBe(400)
+			expect(seventh.json.errors?.[0]?.extensions?.description).toBe('addresses: at most 6 addresses can be saved')
+
+			// Refused whole: the account still holds the six it held before the call.
+			const stored = await readUser(user._id)
+			expect(stored?.addresses).toHaveLength(6)
 		} finally {
 			await user.cleanup()
 		}
@@ -497,6 +522,38 @@ describe('what the collection validator refuses (raw driver)', () => {
 						}
 					}
 				} as never)
+		).rejects.toMatchObject({ code: 121 })
+	})
+
+	// `maxItems: 6` on `addresses`, and this is the half that makes it a rule rather than a message: a
+	// writer that never goes near `funUserAddressAdd` is refused the seventh element too. The copy of
+	// the number in the service buys the shape of the refusal — a 400 a customer can read — and nothing
+	// more.
+	it('refuses a seventh address element, whatever wrote it', async () => {
+		const element = (n: number) => ({
+			_id: new mongoose.Types.ObjectId(),
+			street: `${n} Main Street`,
+			postalCode: '01103',
+			city: 'Springfield',
+			province: 'MA'
+		})
+
+		// Seven in one insert: not a document this collection will hold at all.
+		await expect(seedUser({ addresses: Array.from({ length: 7 }, (_, i) => element(i)) })).rejects.toMatchObject({ code: 121 })
+
+		// And six-plus-one, which is the case the mutation actually meets.
+		const user = await seedUser({ addresses: Array.from({ length: 6 }, (_, i) => element(i)) })
+
+		// ⚠️ The pushed element is one already at rest, under a fresh `_id`. `db()` is the plain driver
+		// with no automatic encryption — `seedUser` encrypts by hand (ADR-029) — so a `$push` written in
+		// plaintext here would be refused for being plaintext, and would prove nothing about the cap.
+		const stored = await readUserEncrypted(user._id)
+		const seventh = { ...(stored?.addresses as Record<string, unknown>[])[0], _id: new mongoose.Types.ObjectId() }
+
+		await expect(
+			db()
+				.collection('user')
+				.updateOne({ _id: user._id }, { $push: { addresses: seventh } } as never)
 		).rejects.toMatchObject({ code: 121 })
 	})
 

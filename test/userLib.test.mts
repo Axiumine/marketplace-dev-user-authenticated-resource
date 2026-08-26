@@ -1,5 +1,5 @@
 import { GraphQLError } from 'graphql'
-import { Types } from 'mongoose'
+import { trusted, Types } from 'mongoose'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const userUpdateOne = vi.fn()
@@ -99,8 +99,55 @@ describe('funUserAddressAdd', () => {
 		expect(minted).toBeInstanceOf(Types.ObjectId)
 
 		const [filter, update] = userUpdateOne.mock.calls[0]
-		expect(filter).toEqual({ _id: userId })
+		expect(filter).toEqual({ _id: userId, 'addresses.5': trusted({ $exists: false }) })
 		expect(update).toEqual({ $push: { addresses: { ...address, _id: minted } } })
+	})
+
+	// ⚠️ The cap is a CLAUSE OF THE FILTER, so the count and the push are one operation. Read-then-push
+	// is two round trips with a window between them, and two adds fired at once both see six and both
+	// go. `addresses.5` and not `$expr`: `sanitizeFilter` is on process-wide and throws on `$expr`, and
+	// index 5 is absent exactly when there is room for a seventh element — including when `addresses`
+	// itself is absent, which is what keeps the FIRST address addable.
+	it('counts and pushes in one atomic update', async () => {
+		await funUserAddressAdd(userId, address)
+
+		expect(userUpdateOne).toHaveBeenCalledOnce()
+		const [filter, update] = userUpdateOne.mock.calls[0] as [Record<string, unknown>, Record<string, unknown>]
+		// `trusted`, and the deep-equal is what pins it: `sanitizeFilter` rewrites an untrusted
+		// `{$exists: false}` into `{$eq: {$exists: false}}`, which matches no document at all and would
+		// refuse every address ever added.
+		expect(filter['addresses.5']).toEqual(trusted({ $exists: false }))
+		expect(update).toHaveProperty('$push')
+		expect(userCountDocuments).not.toHaveBeenCalled()
+	})
+
+	// A miss on the filter is a miss on one of two clauses and the codes differ, so the failing path
+	// pays for one read to find out which. Here the account is there and full: a 400 naming the limit,
+	// which the private area can put in front of the customer.
+	it('answers 400 when the account already holds the maximum', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+
+		expect(await rejection(funUserAddressAdd(userId, address))).toEqual({ title: 'Bad Request', status: 400 })
+		expect(userCountDocuments).toHaveBeenCalledExactlyOnceWith({ _id: userId })
+	})
+
+	// The message carries the number, because a limit the customer cannot see is a refusal they cannot
+	// act on. It rides in `extensions.description`, which is what the three frontends render.
+	it('names the limit in the description the client renders', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+
+		await expect(funUserAddressAdd(userId, address)).rejects.toMatchObject({
+			extensions: { description: 'addresses: at most 6 addresses can be saved' }
+		})
+	})
+
+	// The other half of the same miss: no such account. The session named it a moment ago, so this is
+	// not something a customer did — 500, and no message about addresses, which would be a lie.
+	it('answers 500 when the account itself is gone', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+		userCountDocuments.mockReturnValueOnce(counting(0))
+
+		expect(await rejection(funUserAddressAdd(userId, address))).toEqual({ title: 'Internal Server Error', status: 500 })
 	})
 
 	it('mints a different id on every call', async () => {
@@ -124,6 +171,9 @@ describe('funUserAddressAdd', () => {
 		updateExec.mockResolvedValueOnce({ matchedCount: 1, modifiedCount: 0 })
 
 		expect(await rejection(funUserAddressAdd(userId, address))).toEqual({ title: 'Internal Server Error', status: 500 })
+		// And it never reaches the second read: the cap branch hangs off `matchedCount`, not off
+		// "something went wrong", so a document that matched and did not change is not reported as full.
+		expect(userCountDocuments).not.toHaveBeenCalled()
 	})
 })
 

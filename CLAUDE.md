@@ -39,7 +39,7 @@ One query, six mutations. Every one acts on the account the request is authentic
 |---|---|---|
 | `me` | `GraphQLUserMe!` | no args — session is the only identity |
 | `userPersonalDataUpdate` | `Boolean!` | replaces whole `personalData` sub-doc |
-| `userAddressAdd` | `OnlyIdType!` | new element `_id`, client needs it |
+| `userAddressAdd` | `OnlyIdType!` | new element `_id`, client needs it — **at most 6 per account** |
 | `userAddressUpdate` | `Boolean!` | replaces one element whole |
 | `userAddressDel` | `Boolean!` | hard delete + clears `defaultAddress` same write |
 | `userDefaultAddressSet` | `Boolean!` | one atomic `$set` of a root-level pointer |
@@ -86,6 +86,24 @@ That pipeline is the only pipeline update in the workspace. Two traps in it, bot
   and answered `matchedCount: 1, modifiedCount: 0`. The test for it must pass a **string** id:
   `new Types.ObjectId(oid)` deep-equals its argument, so with an ObjectId fixture the missing coercion is
   unobservable.
+
+⚠️ **`sanitizeFilter` is on process-wide, so a filter cannot use `$expr` and an operator in one needs
+`mongoose.trusted()`.** koa-utils' MongoDB data source calls `mongoose.set('sanitizeFilter', true)`. Two
+different failures come out of that, and only the first is loud:
+
+- `$expr` (also `$where`, `$text`, `$jsonSchema`) **throws** — `$expr is not allowed with sanitizeFilter` —
+  on every call, not only the one that should have been refused.
+- any other value holding a `$` key is silently rewritten to `{$eq: <that object>}`. `{$exists: false}`
+  becomes a search for an element equal to the literal object, matches nothing, and turns a guard into a
+  refusal of everything. `funUserAddressAdd`'s cap clause is `mongoose.trusted({ $exists: false })` for
+  exactly this, and `userLib.test.mts` deep-equals against `trusted(...)` so the symbol is pinned.
+
+⚠️ **Six addresses per account, and the number lives in three repositories.** `maxItems: 6` on
+`addresses` in `marketplace-db-setup/lib/schemas/user.js` is the rule; `MAX_ADDRESSES` in
+`funUserAddressAdd.mts` only buys the shape of the refusal (a 400 naming the limit instead of a validator
+failure surfacing as a 500); the third copy is the account area's. The cap is a **clause of the filter**
+of the same `updateOne` that pushes — `addresses.5` absent — so counting and writing are one operation
+and two concurrent adds cannot both fit through.
 
 ⚠️ **A value containing whitespace must be quoted in the environment file, in single quotes.** dotenv
 terminates a bare value at the first space, hands back the truncated prefix and reports no error. Not

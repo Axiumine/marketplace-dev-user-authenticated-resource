@@ -52,7 +52,7 @@ since every `globalSetup` drops its own database.
 |---|---|
 |`index.itest.mts`|the bearer gate against a live Redis session (412 / 499 / 498 / **403** for another tier and for a session with no `tier` at all), the `x-introspectioncode` bypass, CSRF on GET, a full `me` selection, and a secret-non-leak check that no hash reaches the wire|
 |`account.itest.mts`|`userPersonalDataUpdate` and `userUpdatePwd` against the real validator — including a raw-driver counter-proof that `contacts: { mobile: null }` is refused with `code: 121` while a real number is accepted, and real bcrypt on both sides of the password change|
-|`addresses.itest.mts`|the three address mutations plus `userDefaultAddressSet`, and a block that drives the collection validator directly: `$pull` of the default rejected, `$pull` of a non-default accepted, a foreign pointer rejected, a pointer with no `addresses` rejected|
+|`addresses.itest.mts`|the three address mutations plus `userDefaultAddressSet`, including the six-address cap — six accepted through the real mutation, the seventh answered 400 — and a block that drives the collection validator directly: `$pull` of the default rejected, `$pull` of a non-default accepted, a foreign pointer rejected, a pointer with no `addresses` rejected, a seventh address rejected on insert and on `$push`|
 |`shutdown.itest.mts`|`gracefulShutdown`, the process-level handlers, production introspection refusal, and the 5s teardown budget lost for real against a local blackhole socket|
 |`startFailure.itest.mts`|`start()`'s catch arm with a URL MongoDB genuinely refuses, and the env guard running *outside* the try|
 
