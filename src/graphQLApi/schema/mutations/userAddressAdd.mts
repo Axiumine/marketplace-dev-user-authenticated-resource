@@ -21,6 +21,11 @@ interface IArgs {
  *
  * No ownership guard, and none is possible: the address does not exist yet, and the account it lands on
  * is the session's.
+ *
+ * ⚠️ **It can answer 400 for a well-formed address**, which no other write on this tier does: the
+ * account may already hold the six `funUserAddressAdd` allows. `validateUserAddress` cannot see that —
+ * it is handed one address and knows nothing about the document it is going into — so the refusal comes
+ * from the write itself, through `tryCatchRethrow` like every other rejection here.
  */
 export const userAddressAdd = {
 	type: new GraphQLNonNull(OnlyIdType),
