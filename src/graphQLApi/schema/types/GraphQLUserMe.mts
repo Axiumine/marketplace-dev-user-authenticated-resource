@@ -43,7 +43,7 @@ export const GraphQLUserMe = new GraphQLObjectType({
  * makes every one of its equivalents NonNull because that tier collects a full record at onboarding;
  * a customer types a name into a profile page and leaves the rest.
  */
-const GraphQLUserPersonalData = new GraphQLObjectType({
+export const GraphQLUserPersonalData = new GraphQLObjectType({
 	name: 'GraphQLUserPersonalData',
 	fields: () => ({
 		firstName: { type: new GraphQLNonNull(GraphQLString) },
@@ -81,7 +81,7 @@ const GraphQLUserContacts = new GraphQLObjectType({
  * `position` is nullable for the same reason as on the shop owner: the point arrives when the address
  * is picked from the geocoder's autocomplete, and one typed by hand has no map until it is re-picked.
  */
-const GraphQLUserAddress = new GraphQLObjectType({
+export const GraphQLUserAddress = new GraphQLObjectType({
 	name: 'GraphQLUserAddress',
 	fields: () => ({
 		_id: { type: new GraphQLNonNull(GraphQLID) },

@@ -33,17 +33,19 @@ names the tests that should have failed, and it costs nobody the machine.
 
 ## Surface
 
-One query, six mutations. Every one acts on the account the request is authenticated as.
+Two queries, seven mutations. Every one acts on the account the request is authenticated as.
 
 | Operation | Answers | Notes |
 |---|---|---|
 | `me` | `GraphQLUserMe!` | no args — session is the only identity |
+| `userExport` | `GraphQLUserExport!` | GDPR Art. 20 — `me` plus `login.firstLogin` / `login.lastLogin` |
 | `userPersonalDataUpdate` | `Boolean!` | replaces whole `personalData` sub-doc |
 | `userAddressAdd` | `OnlyIdType!` | new element `_id`, client needs it — **at most 6 per account** |
 | `userAddressUpdate` | `Boolean!` | replaces one element whole |
 | `userAddressDel` | `Boolean!` | hard delete + clears `defaultAddress` same write |
 | `userDefaultAddressSet` | `Boolean!` | one atomic `$set` of a root-level pointer |
 | `userUpdatePwd` | `Boolean!` | requires current password |
+| `userDel` | `Boolean!` | GDPR Art. 17 — soft-delete stamp + every session revoked |
 
 ## Not a rename of the ShopOwner service
 
@@ -86,6 +88,25 @@ That pipeline is the only pipeline update in the workspace. Two traps in it, bot
   and answered `matchedCount: 1, modifiedCount: 0`. The test for it must pass a **string** id:
   `new Types.ObjectId(oid)` deep-equals its argument, so with an ObjectId fixture the missing coercion is
   unobservable.
+
+⚠️ **`userDel` is the one write here that a suspended customer may still make, and the one that keeps
+an address occupied after it runs.** Two things about it that read as omissions and are not:
+
+- **`disabled` is deliberately not a gate.** Every other write on this tier runs
+  `checkUserAuthorizationDisDel` and answers 401 to a suspended account; `funUserDel` checks only that
+  the document exists and is not already stamped. Suspension is a platform decision about what somebody
+  may *do*; the right to erasure is not something the platform suspends. `userLib.test.mts` pins the
+  absence of that call, so restoring it fails the suite rather than passing silently.
+- **The address stays taken for the retention window, not forever.** `login.email_unique` carries no
+  `partialFilterExpression`, so a soft-deleted document still holds its address and the same person
+  cannot re-register with it. What frees it is the 30-day purge decided in `phase1/NFR.md` open
+  question 6 — **which does not exist yet**: no TTL index, no scheduled job. Until it is built, closing
+  an account burns its email address permanently, and that is a gap rather than a design.
+
+The already-closed branch answers **410**, not 401, and it is reachable only through a session that
+outlived the close — the ordinary second call is refused 498 by the token layer, because the first one
+revoked the caller's session. 401 on this tier keeps its single meaning: a resolver read your account
+and refused it.
 
 ⚠️ **`sanitizeFilter` is on process-wide, so a filter cannot use `$expr` and an operator in one needs
 `mongoose.trusted()`.** koa-utils' MongoDB data source calls `mongoose.set('sanitizeFilter', true)`. Two

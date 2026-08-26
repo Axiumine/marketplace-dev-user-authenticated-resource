@@ -8,6 +8,7 @@ const funUserAddressAdd = vi.fn()
 const funUserAddressDel = vi.fn()
 const funUserAddressUpdate = vi.fn()
 const funUserDefaultAddressSet = vi.fn()
+const funUserDel = vi.fn()
 const funUserPersonalDataUpdate = vi.fn()
 const funUserUpdatePwd = vi.fn()
 const throwIfUserDontOwnAddress = vi.fn()
@@ -18,6 +19,7 @@ vi.mock('@lib/user/funUserAddressAdd.mjs', () => ({ funUserAddressAdd }))
 vi.mock('@lib/user/funUserAddressDel.mjs', () => ({ funUserAddressDel }))
 vi.mock('@lib/user/funUserAddressUpdate.mjs', () => ({ funUserAddressUpdate }))
 vi.mock('@lib/user/funUserDefaultAddressSet.mjs', () => ({ funUserDefaultAddressSet }))
+vi.mock('@lib/user/funUserDel.mjs', () => ({ funUserDel }))
 vi.mock('@lib/user/funUserPersonalDataUpdate.mjs', () => ({ funUserPersonalDataUpdate }))
 vi.mock('@lib/user/funUserUpdatePwd.mjs', () => ({ funUserUpdatePwd }))
 vi.mock('@lib/user/throwIfUserDontOwnAddress.mjs', () => ({ throwIfUserDontOwnAddress }))
@@ -30,6 +32,7 @@ const { userAddressAdd } = await import('../src/graphQLApi/schema/mutations/user
 const { userAddressDel } = await import('../src/graphQLApi/schema/mutations/userAddressDel.mts')
 const { userAddressUpdate } = await import('../src/graphQLApi/schema/mutations/userAddressUpdate.mts')
 const { userDefaultAddressSet } = await import('../src/graphQLApi/schema/mutations/userDefaultAddressSet.mts')
+const { userDel } = await import('../src/graphQLApi/schema/mutations/userDel.mts')
 const { userPersonalDataUpdate } = await import('../src/graphQLApi/schema/mutations/userPersonalDataUpdate.mts')
 const { userUpdatePwd } = await import('../src/graphQLApi/schema/mutations/userUpdatePwd.mts')
 
@@ -59,6 +62,7 @@ beforeEach(() => {
 	funUserAddressDel.mockReset().mockResolvedValue(undefined)
 	funUserAddressUpdate.mockReset().mockResolvedValue(undefined)
 	funUserDefaultAddressSet.mockReset().mockResolvedValue(undefined)
+	funUserDel.mockReset().mockResolvedValue(undefined)
 	funUserPersonalDataUpdate.mockReset().mockResolvedValue(undefined)
 	funUserUpdatePwd.mockReset().mockResolvedValue(undefined)
 	throwIfUserDontOwnAddress.mockReset().mockResolvedValue(undefined)
@@ -200,6 +204,74 @@ describe('userDefaultAddressSet', () => {
 			title: 'Internal Server Error',
 			status: 500
 		})
+	})
+})
+
+describe('userDel', () => {
+	// ⚠️ No `_id` argument and no ownership guard, and on this mutation the absence is sharper than
+	// anywhere else on the tier: every customer authenticates against the same collection and the
+	// platform has no role field, so an account id accepted here would make this "close any customer's
+	// account". The account is the session's.
+	it('closes the session’s own account and answers true', async () => {
+		await expect(userDel.resolve(null, {}, ctx)).resolves.toBe(true)
+
+		expect(funUserDel).toHaveBeenCalledExactlyOnceWith(userId)
+		expect(throwIfUserDontOwnAddress).not.toHaveBeenCalled()
+	})
+
+	/*
+	 * ⚠️ **Every session ends, and only after the stamp landed.** Revoking first would log a customer
+	 * out of every device for a closure that then failed; not revoking at all would leave a closed
+	 * account with live sessions still inside it, which is the one outcome this mutation exists to
+	 * prevent. The caller's own session goes with the rest — which is also what makes a second call
+	 * unreachable, since the next request they send is refused by the auth middleware.
+	 */
+	it('ends every session the account holds, after the account was closed', async () => {
+		await expect(userDel.resolve(null, {}, ctx)).resolves.toBe(true)
+
+		expect(endEverySession).toHaveBeenCalledExactlyOnceWith(ctx)
+		expect(endEverySession.mock.invocationCallOrder[0]).toBeGreaterThan(funUserDel.mock.invocationCallOrder[0])
+	})
+
+	// The revoke is not attempted when the stamp did not land. An account that is still open must keep
+	// the sessions its customer is legitimately using.
+	it('revokes nothing when the account was not closed', async () => {
+		funUserDel.mockRejectedValueOnce(
+			new GraphQLError('Oops', { extensions: { http: { status: 410 }, description: 'account already closed' } })
+		)
+
+		await rejection(userDel.resolve(null, {}, ctx))
+
+		expect(endEverySession).not.toHaveBeenCalled()
+	})
+
+	/*
+	 * ⚠️ **A revoke that fails fails the mutation.** Answering `true` here would tell a customer their
+	 * account is closed while every device they were signed in on still holds a working token — and the
+	 * document really is stamped, so the lie would be about the half that matters.
+	 */
+	it('fails loudly when the sessions cannot be ended, rather than answering true', async () => {
+		endEverySession.mockRejectedValueOnce(new Error('redis down'))
+
+		expect(await rejection(userDel.resolve(null, {}, ctx))).toEqual({ title: 'Internal Server Error', status: 500 })
+	})
+
+	// The 410 a second call answers must reach the client as a 410: flattened to a 500 it would read as
+	// "we broke" instead of "this account is already closed".
+	it('preserves the status of an error the lib already classified', async () => {
+		funUserDel.mockRejectedValueOnce(
+			new GraphQLError('Oops', { extensions: { http: { status: 410 }, description: 'account already closed' } })
+		)
+
+		expect(await rejection(userDel.resolve(null, {}, ctx))).toEqual({ title: 'Oops', status: 410 })
+		expect(captureException).not.toHaveBeenCalled()
+	})
+
+	it('rewraps an unclassified failure as a 500', async () => {
+		funUserDel.mockRejectedValueOnce(new Error('mongo down'))
+
+		expect(await rejection(userDel.resolve(null, {}, ctx))).toEqual({ title: 'Internal Server Error', status: 500 })
+		expect(captureException).toHaveBeenCalledTimes(1)
 	})
 })
 

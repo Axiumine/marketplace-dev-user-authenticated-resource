@@ -16,6 +16,7 @@ import { ENDPOINT } from '../../src/index.mts'
 import {
 	baseUrl,
 	bootServer,
+	db,
 	drainAndClose,
 	gql,
 	INTROSPECTION_CODE,
@@ -329,6 +330,171 @@ describe('me (real projection over the real collection)', () => {
 			const { json } = await gql(ME, session.headers)
 
 			expect(json.data).toBeNull()
+			expect(json.errors?.[0]?.message).toBe('Unauthorized')
+		} finally {
+			await session.cleanup()
+		}
+	})
+})
+
+/****************************************************************************************
+ * The GDPR Art. 20 export, over the real collection.
+ *
+ * `me` above already proves the decryption round-trip for the fields the private area renders.
+ * What only this block can prove is the *difference* between the two selections: `userExport`
+ * additionally hands back `login.firstLogin` and `login.lastLogin`, and its projection is the sole
+ * thing keeping the rest of `login` out — `decryptDocument` decrypts every subtype-6 value it finds
+ * regardless of what was asked for, so a projection that grew a `login` would return a decrypted
+ * `newEmailTmp` to the customer with no other layer objecting.
+ ****************************************************************************************/
+describe('userExport (Art. 20, real projection over the real collection)', () => {
+	/** Every field of the export type, so nothing can be added to it without this selection noticing. */
+	const USER_EXPORT = `{
+		userExport {
+			_id
+			email
+			personalData { firstName lastName birth { date } contacts { mobile landline email } }
+			addresses { _id street postalCode city province label position { type coordinates } }
+			defaultAddress
+			registeredAt
+			firstLogin
+			lastLogin
+		}
+	}`
+
+	// ⚠️ Written with the raw driver rather than through `seedUser`'s overrides on purpose: overriding
+	// `login` replaces the whole sub-document, which would drop the generated address the helper hands
+	// back and the 60-character hash the validator insists on. These two paths are absent from
+	// ENCRYPTED_FIELDS_USER (ADR-029), so a plaintext write here is what the login path writes too.
+	const stampLogins = (_id: mongoose.Types.ObjectId, firstLogin: Date, lastLogin: Date) =>
+		db()
+			.collection('user')
+			.updateOne({ _id }, { $set: { 'login.firstLogin': firstLogin, 'login.lastLogin': lastLogin } })
+
+	it('returns the eight fields the customer is owed, decrypted, timestamps included', async () => {
+		const addressId = new mongoose.Types.ObjectId()
+		const firstLogin = new Date('2026-01-04T08:30:00.000Z')
+		const lastLogin = new Date('2026-08-25T19:45:00.000Z')
+		const user = await withSignedInUser({
+			personalData: {
+				firstName: 'Ada',
+				lastName: 'Lovelace',
+				birth: { date: new Date('1815-12-10T00:00:00.000Z') },
+				contacts: { mobile: '+15550100', landline: '+15550101', email: 'ada@marketplace.invalid' }
+			},
+			addresses: [
+				{
+					_id: addressId,
+					label: 'Home',
+					street: '1 Test Street',
+					postalCode: '01103',
+					city: 'Springfield',
+					province: 'MA',
+					position: { type: 'Point', coordinates: [-72.5898, 42.1015] }
+				}
+			],
+			defaultAddress: addressId
+		})
+
+		try {
+			await stampLogins(user._id, firstLogin, lastLogin)
+
+			const { status, json } = await gql(USER_EXPORT, user.headers)
+
+			expect(status).toBe(200)
+			expect(json.errors).toBeUndefined()
+			expect(json.data?.userExport).toEqual({
+				_id: user._id.toHexString(),
+				email: user.email,
+				personalData: {
+					firstName: 'Ada',
+					lastName: 'Lovelace',
+					birth: { date: '1815-12-10T00:00:00.000Z' },
+					contacts: { mobile: '+15550100', landline: '+15550101', email: 'ada@marketplace.invalid' }
+				},
+				addresses: [
+					{
+						_id: addressId.toHexString(),
+						label: 'Home',
+						street: '1 Test Street',
+						postalCode: '01103',
+						city: 'Springfield',
+						province: 'MA',
+						position: { type: 'Point', coordinates: [-72.5898, 42.1015] }
+					}
+				],
+				defaultAddress: addressId.toHexString(),
+				registeredAt: expect.any(String),
+				firstLogin: firstLogin.toISOString(),
+				lastLogin: lastLogin.toISOString()
+			})
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	// A customer who registered and never filled anything in still gets an export — an empty one is an
+	// answer to an Art. 20 request, a 500 is not. `personalData` is not a required field on this
+	// collection, and a customer who has never logged in has neither timestamp.
+	it('exports a bare account as nulls and an empty address list rather than failing', async () => {
+		const user = await withSignedInUser()
+
+		try {
+			const { json } = await gql(USER_EXPORT, user.headers)
+
+			expect(json.errors).toBeUndefined()
+			expect(json.data?.userExport).toMatchObject({
+				email: user.email,
+				personalData: null,
+				addresses: [],
+				defaultAddress: null,
+				firstLogin: null,
+				lastLogin: null
+			})
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	// The same two-layer check `me` gets, and it matters more here: this is the one selection on the
+	// tier that reaches into `login`, so the projection is doing the work by naming three paths rather
+	// than the sub-document.
+	it('leaks no credential material, and has no field to ask for one with', async () => {
+		// Exactly 50 characters each: EMAIL_HASH_LEN in koa-utils, and both fields are pinned to it by
+		// `minLength`/`maxLength` in the validator. A bcrypt-shaped literal is refused at the insert.
+		const resetHash = 'r'.repeat(50)
+		const emailHash = 'e'.repeat(50)
+		const user = await withSignedInUser({
+			resetPwd: { resetDateReq: new Date(), resetHash },
+			emailVerify: { valid: true, hash: emailHash, newEmailTmp: 'pending@marketplace.invalid' }
+		})
+
+		try {
+			const { json } = await gql(USER_EXPORT, user.headers)
+
+			expect(json.errors).toBeUndefined()
+			const serialised = JSON.stringify(json.data)
+			expect(serialised).not.toContain(PASSWORD_HASH)
+			expect(serialised).not.toContain(resetHash)
+			expect(serialised).not.toContain(emailHash)
+			// ⚠️ The one a projection regression would surface: `newEmailTmp` is encrypted at rest, and
+			// `decryptDocument` would hand it back in plaintext to anything that selected `login`.
+			expect(serialised).not.toContain('pending@marketplace.invalid')
+
+			const denied = await gql('{ userExport { login { password } } }', user.headers)
+			expect(denied.json.errors?.[0]?.message).toMatch(/Cannot query field "login"/)
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	it('answers 401 when the live session points at a customer MongoDB does not have', async () => {
+		const session = await withSession()
+
+		try {
+			const { status, json } = await gql(USER_EXPORT, session.headers)
+
+			expect(status).toBe(401)
 			expect(json.errors?.[0]?.message).toBe('Unauthorized')
 		} finally {
 			await session.cleanup()

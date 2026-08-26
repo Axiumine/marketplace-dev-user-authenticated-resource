@@ -1,3 +1,4 @@
+import { redisClient } from '@axiumine/koa-utils/dataSources/Redis'
 import { encryptPassword } from '@axiumine/koa-utils/lib/encryptPassword'
 import { compareHashAsync } from '@axiumine/koa-utils/lib/hash'
 import { encryptDocument } from '@axiumine/marketplace-common/encryption/encryptDocument'
@@ -5,8 +6,10 @@ import { ENCRYPTED_FIELDS_USER, KEY_ALT_NAME_USER } from '@axiumine/marketplace-
 import { ALGORITHM_DETERMINISTIC } from '@axiumine/marketplace-common/encryption/EncryptionAlgorithm'
 import { encryptValue } from '@axiumine/marketplace-common/encryption/fieldEncryption'
 import { isCiphertext } from '@axiumine/marketplace-common/encryption/isCiphertext'
+import { sessionKey } from '@axiumine/marketplace-common/others/sessionKeys'
 import * as dotenv from 'dotenv'
 import type { Server } from 'http'
+import mongoose from 'mongoose'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 dotenv.config()
@@ -380,6 +383,133 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 
 			expect(status).toBe(401)
 			expect(json.errors?.[0]?.message).toBe('Unauthorized')
+		} finally {
+			await session.cleanup()
+		}
+	})
+})
+
+/****************************************************************************************
+ * Closing an account (GDPR Art. 17), against the real collection and the real Redis cluster.
+ *
+ * The unit suite proves the stamp and the revoke order against mocks. Two things only a real
+ * run can answer: whether the collection validator accepts a `deleted`-only `$set` on a
+ * document that carries a `defaultAddress` — the `$expr` half of the validator re-runs on
+ * every update, not only on the field being written — and whether the caller's session key is
+ * really gone from the cluster afterwards, which is the half of the story a mocked Redis
+ * always agrees to.
+ ****************************************************************************************/
+describe('userDel (soft delete + revoke, real collection + real Redis cluster)', () => {
+	const CLOSE = 'mutation { userDel }'
+
+	/** The cluster key behind a header the harness minted — `Bearer access:<uuid>` minus the scheme. */
+	const keyOf = (headers: { authorization: string }) => sessionKey(headers.authorization.replace('Bearer ', ''))
+
+	// ⚠️ The seed carries an address AND the default pointer at it, deliberately: the `$expr` clause of
+	// the validator is evaluated against the whole updated document, so a write that only touches
+	// `deleted` still has to leave that pointer valid. A mocked `updateOne` has no opinion about it.
+	it('stamps the account, leaves it in place, and ends the caller’s session', async () => {
+		const addressId = new mongoose.Types.ObjectId()
+		const user = await withSignedInUser({
+			addresses: [{ _id: addressId, street: '1 Test Street', postalCode: '01103', city: 'Springfield', province: 'MA' }],
+			defaultAddress: addressId
+		})
+
+		try {
+			expect(await redisClient.exists(keyOf(user.headers))).toBe(1)
+
+			const { status, json } = await gql(CLOSE, user.headers)
+
+			expect(status).toBe(200)
+			expect(json.data).toEqual({ userDel: true })
+
+			// A soft delete: the document is still there, and so is everything in it. The purge that
+			// removes it 30 days after closure does not exist yet — `phase1/NFR.md` open question 6.
+			const stored = await readUser(user._id)
+			expect(stored?.deleted).toBeInstanceOf(Date)
+			expect(stored?.login.email).toBe(user.email)
+			expect(stored?.addresses).toHaveLength(1)
+
+			// The other half, and the one a mock cannot answer: the caller is out.
+			expect(await redisClient.exists(keyOf(user.headers))).toBe(0)
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	// ⚠️ **The practical second-call path never reaches the resolver at all.** The first call revoked
+	// the caller's session, so the auth middleware refuses the next request before any resolver runs —
+	// which is what makes closing an account idempotent in practice rather than by resolver logic.
+	//
+	// 498 rather than 401, and the distinction is the whole point: the middleware looked the token up on
+	// the cluster, found nothing, and says so with `throwAccessTokenExpiredOrDeleted`. 401 on this tier
+	// means a resolver read the account and refused it. A client seeing 498 re-logins; the resolver's own
+	// 410 below is only reachable when a session somehow outlives the close.
+	it('refuses a second call on the same session at the token layer, not in the resolver', async () => {
+		const user = await withSignedInUser()
+
+		try {
+			expect((await gql(CLOSE, user.headers)).status).toBe(200)
+
+			const { status, json } = await gql(CLOSE, user.headers)
+
+			expect(status).toBe(498)
+			// The token layer sits in front of Apollo, so this is tdwKoaErrorHandler's `{message, description}`
+			// envelope rather than a GraphQL `errors` array — the request never became a GraphQL operation.
+			expect(json.message).toBe('Invalid Token')
+			expect(json.errors).toBeUndefined()
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	// The resolver's own 410 guard, reachable only through a session that outlived the first close —
+	// the window where the stamp landed and the revoke did not. Seeded here by giving a live session to
+	// an account that is already closed.
+	it('answers 410 when the account is already closed', async () => {
+		const user = await withSignedInUser({ deleted: new Date('2026-08-20T10:00:00.000Z') })
+
+		try {
+			const { status, json } = await gql(CLOSE, user.headers)
+
+			expect(status).toBe(410)
+			expect(json.errors?.[0]?.extensions?.description).toBe('account already closed')
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	// ⚠️ The one write on this tier that a suspended customer may still make. Every other one runs
+	// `checkUserAuthorizationDisDel` and answers 401; suspension is a platform decision about what
+	// somebody may do, and the right to erasure is not something the platform suspends.
+	it('lets a suspended customer close their account, unlike every other write here', async () => {
+		const user = await withSignedInUser({ disabled: true })
+
+		try {
+			const { status, json } = await gql(CLOSE, user.headers)
+
+			expect(status).toBe(200)
+			expect(json.data).toEqual({ userDel: true })
+
+			const stored = await readUser(user._id)
+			expect(stored?.deleted).toBeInstanceOf(Date)
+			// The flag stays: an operator's record of the suspension is not erased by the customer.
+			expect(stored?.disabled).toBe(true)
+		} finally {
+			await user.cleanup()
+		}
+	})
+
+	it('answers 401 when the live session names a customer MongoDB does not have', async () => {
+		const session = await withSession()
+
+		try {
+			const { status, json } = await gql(CLOSE, session.headers)
+
+			expect(status).toBe(401)
+			expect(json.errors?.[0]?.message).toBe('Unauthorized')
+			// Nothing was revoked either: the account could not be closed, so the session stays as it was.
+			expect(await redisClient.exists(keyOf(session.headers))).toBe(1)
 		} finally {
 			await session.cleanup()
 		}

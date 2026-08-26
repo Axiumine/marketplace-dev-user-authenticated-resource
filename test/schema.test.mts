@@ -62,30 +62,45 @@ describe('schema', () => {
 		expect(result.errors).toBeUndefined()
 	})
 
-	// ⚠️ One query, and there is deliberately no `user(_id:)` beside it. A customer may read exactly
-	// one account — theirs — so the identity comes from the session and from nowhere else. An `_id`
-	// argument would need an equality check against `ctx.state.user._id` to be safe, and a check only
-	// ever satisfied by the value it is compared against is an argument that should not exist.
-	it('exposes the account query and nothing else', () => {
-		expect(fieldsOf('QueriesApi')).toEqual(['me'])
+	// ⚠️ Two queries, both of them the caller's own account, and there is deliberately no `user(_id:)`
+	// beside them. A customer may read exactly one account — theirs — so the identity comes from the
+	// session and from nowhere else. An `_id` argument would need an equality check against
+	// `ctx.state.user._id` to be safe, and a check only ever satisfied by the value it is compared
+	// against is an argument that should not exist.
+	it('exposes the account query and its export, and nothing else', () => {
+		expect(fieldsOf('QueriesApi')).toEqual(['me', 'userExport'])
 	})
 
-	it('takes no arguments, because the session is the only identity', () => {
-		expect(argsOf('QueriesApi', 'me')).toEqual([])
+	// ⚠️ **`userExport` takes none either, and that is what makes portability self-service.** An
+	// argument here would be the first half of an operator-facing export, which is the shape ADR-029
+	// refuses: reading across accounts would need `user` to be searchable, and it deliberately is not.
+	it.each([['me'], ['userExport']])('%s takes no arguments, because the session is the only identity', (name) => {
+		expect(argsOf('QueriesApi', name)).toEqual([])
 	})
 
-	it('carries its exact description', () => {
-		expect(descriptionOf('QueriesApi', 'me')).toBe('the signed-in customer own account')
+	it.each([
+		['me', 'the signed-in customer own account'],
+		['userExport', 'the signed-in customer own record, for a GDPR Art. 20 export']
+	])('%s carries its exact description', (name, description) => {
+		expect(descriptionOf('QueriesApi', name)).toBe(description)
+	})
+
+	it.each([
+		['me', 'GraphQLUserMe!'],
+		['userExport', 'GraphQLUserExport!']
+	])('%s answers %s', (name, type) => {
+		expect(typeOfField('QueriesApi', name)).toBe(type)
 	})
 
 	// The whole write surface of the tier. No `itemAdd`, no `company*`: a customer owns nothing but
 	// their own account, and — until orders exist — cannot buy anything either.
-	it('exposes the six account mutations', () => {
+	it('exposes the seven account mutations', () => {
 		expect(fieldsOf('MutationsApi')).toEqual([
 			'userAddressAdd',
 			'userAddressDel',
 			'userAddressUpdate',
 			'userDefaultAddressSet',
+			'userDel',
 			'userPersonalDataUpdate',
 			'userUpdatePwd'
 		])
@@ -112,6 +127,9 @@ describe('mutation arguments', () => {
 		['userAddressDel', ['_id']],
 		['userAddressUpdate', ['_id', 'address']],
 		['userDefaultAddressSet', ['_id']],
+		// ⚠️ `userDel` takes none at all, and of the seven this is the one where an account id would be
+		// worst: it would turn "close my account" into "close anybody's".
+		['userDel', []],
 		['userPersonalDataUpdate', ['personalData']],
 		['userUpdatePwd', ['passwordOld', 'passwordNew']]
 	])('%s takes %j', (name, expected) => {
@@ -132,6 +150,7 @@ describe('mutation arguments', () => {
 		['userAddressDel', 'del an address of the signed-in customer'],
 		['userAddressUpdate', 'update an address of the signed-in customer'],
 		['userDefaultAddressSet', 'set the default address of the signed-in customer'],
+		['userDel', 'closes the signed-in customer account'],
 		['userPersonalDataUpdate', 'update the signed-in customer personal data'],
 		['userUpdatePwd', 'updates the password of the signed-in customer account']
 	])('%s carries its exact description', (name, description) => {
@@ -146,6 +165,7 @@ describe('mutation arguments', () => {
 		['userAddressDel', 'Boolean!'],
 		['userAddressUpdate', 'Boolean!'],
 		['userDefaultAddressSet', 'Boolean!'],
+		['userDel', 'Boolean!'],
 		['userPersonalDataUpdate', 'Boolean!'],
 		['userUpdatePwd', 'Boolean!']
 	])('%s answers %s', (name, type) => {
@@ -164,6 +184,50 @@ describe('object types', () => {
 
 	it.each([['login'], ['password'], ['resetPwd'], ['emailVerify'], ['waitApprov']])('GraphQLUserMe has no %s field', (name) => {
 		expect(fieldsOf('GraphQLUserMe')).not.toContain(name)
+	})
+
+	// ⚠️ **The export is `Me` plus the two login timestamps, and the delta is the whole design.** An
+	// export is "the data concerning them", not "everything stored about them": the timestamps are
+	// theirs, `onboardingStep` / `onboardingDone` are read by the ShopOwner tier and mean nothing on a
+	// customer, and `rememberMe` is a checkbox on a form rather than a fact about a person.
+	it('GraphQLUserExport carries the account, its addresses and the two login timestamps', () => {
+		expect(fieldsOf('GraphQLUserExport')).toEqual([
+			'_id',
+			'email',
+			'personalData',
+			'addresses',
+			'defaultAddress',
+			'registeredAt',
+			'firstLogin',
+			'lastLogin'
+		])
+	})
+
+	// ⚠️ `deleted` and `disabled` are on the list deliberately: they are the platform's own moderation
+	// state, and a data-export endpoint that handed them back would tell a customer somebody had
+	// flagged their account. The other four are secrets, each on its own enough to take it over.
+	it.each([['login'], ['password'], ['resetPwd'], ['emailVerify'], ['deleted'], ['disabled'], ['rememberMe']])(
+		'GraphQLUserExport has no %s field',
+		(name) => {
+			expect(fieldsOf('GraphQLUserExport')).not.toContain(name)
+		}
+	)
+
+	// ⚠️ **One type, not two copies.** GraphQL forbids two types sharing a name, so restating the
+	// address or the personal data inside `GraphQLUserExport` would not assemble — which is why both
+	// are exported from `GraphQLUserMe.mts`. This pins that they really are the same types, so a field
+	// added to the account page cannot silently go missing from the export.
+	it('shares the address and personal-data types with GraphQLUserMe rather than copying them', () => {
+		expect(typeOfField('GraphQLUserExport', 'addresses')).toBe('[GraphQLUserAddress!]!')
+		expect(typeOfField('GraphQLUserExport', 'personalData')).toBe('GraphQLUserPersonalData')
+	})
+
+	// The two timestamps are nullable and the six inherited fields keep the nullability they have on
+	// `Me`: an account that registered and never confirmed its email has neither login stamp.
+	it('leaves the optional fields nullable on the export, and nothing else', () => {
+		const nullable = fieldsOf('GraphQLUserExport').filter((name) => !typeOfField('GraphQLUserExport', name).endsWith('!'))
+
+		expect(nullable).toEqual(['personalData', 'defaultAddress', 'firstLogin', 'lastLogin'])
 	})
 
 	// The type is called `Me`, not `User`, and the name is doing work: a `GraphQLUser` would invite a

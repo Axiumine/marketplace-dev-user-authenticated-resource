@@ -26,6 +26,7 @@ const { funUserAddressAdd } = await import('../src/lib/user/funUserAddressAdd.mt
 const { funUserAddressDel } = await import('../src/lib/user/funUserAddressDel.mts')
 const { funUserAddressUpdate } = await import('../src/lib/user/funUserAddressUpdate.mts')
 const { funUserDefaultAddressSet } = await import('../src/lib/user/funUserDefaultAddressSet.mts')
+const { funUserDel } = await import('../src/lib/user/funUserDel.mts')
 const { funUserPersonalDataUpdate } = await import('../src/lib/user/funUserPersonalDataUpdate.mts')
 const { funUserUpdatePwd } = await import('../src/lib/user/funUserUpdatePwd.mts')
 const { throwIfUserDontOwnAddress } = await import('../src/lib/user/throwIfUserDontOwnAddress.mts')
@@ -43,7 +44,7 @@ function counting(found: number) {
 	return { lean: vi.fn().mockResolvedValue(found) }
 }
 
-/** `findById()` answers a Query; `funUserUpdatePwd` ends it with `.select().lean()`. */
+/** `findById()` answers a Query; `funUserUpdatePwd` and `funUserDel` end it with `.select().lean()`. */
 function reading(doc: unknown) {
 	return { select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(doc) }) }
 }
@@ -314,6 +315,91 @@ describe('funUserPersonalDataUpdate', () => {
 			title: 'Internal Server Error',
 			status: 500
 		})
+	})
+})
+
+describe('funUserDel', () => {
+	const live = { _id: userId }
+
+	beforeEach(() => {
+		userFindById.mockReturnValue(reading(live))
+	})
+
+	// The stamp, and nothing else in the write. `Date.now()` is a number and the schema path is a
+	// `Date` — mongoose casts it, which is why the assertion is on the type and not on a Date instance.
+	// The filter carries no `deleted` clause of its own: the guard below has already established the
+	// document is live.
+	it('stamps deleted on the account named by the session, and touches nothing else', async () => {
+		await expect(funUserDel(userId)).resolves.toBeUndefined()
+
+		const [filter, update] = userUpdateOne.mock.calls[0]
+		expect(userUpdateOne).toHaveBeenCalledOnce()
+		expect(filter).toEqual({ _id: userId })
+		expect(Object.keys(update)).toEqual(['$set'])
+		expect(Object.keys(update.$set)).toEqual(['deleted'])
+		expect(typeof update.$set.deleted).toBe('number')
+	})
+
+	// ⚠️ A soft delete: `updateOne`, never `deleteOne`. The mocked `User` deliberately carries no
+	// `deleteOne` at all, so a regression to a hard delete fails here as a TypeError rather than
+	// passing every assertion and removing a document on a real collection.
+	it('reads only the two fields it needs to decide', async () => {
+		await funUserDel(userId)
+
+		expect(userFindById).toHaveBeenCalledExactlyOnceWith(userId)
+		expect(userFindById.mock.results[0].value.select).toHaveBeenCalledExactlyOnceWith('_id deleted')
+	})
+
+	// 401 and not 404: the session outlived the account, and the caller learns their session is no
+	// good and nothing more — the same answer `me` and `funUserUpdatePwd` give.
+	it('answers 401 when the session outlived the account', async () => {
+		userFindById.mockReturnValueOnce(reading(null))
+
+		expect(await rejection(funUserDel(userId))).toEqual({ title: 'Unauthorized', status: 401 })
+		expect(userUpdateOne).not.toHaveBeenCalled()
+	})
+
+	// ⚠️ 410 rather than the 401 every other refusal on this tier answers, deliberately: a 401 means
+	// "your session is no longer good", which is exactly what this is not. In practice the branch is
+	// nearly unreachable — the first call revoked every session — and it exists for the window where
+	// the write landed and the revoke did not.
+	it('answers 410 for an account already closed, without writing again', async () => {
+		userFindById.mockReturnValueOnce(reading({ _id: userId, deleted: new Date('2026-08-20T10:00:00.000Z') }))
+
+		expect(await rejection(funUserDel(userId))).toEqual({ title: 'Oops', status: 410 })
+		expect(userUpdateOne).not.toHaveBeenCalled()
+	})
+
+	// The envelope of a 410 says nothing about which 410 it is, so the text carries the whole meaning.
+	it('names the reason in the refusal, since the envelope does not', async () => {
+		userFindById.mockReturnValueOnce(reading({ _id: userId, deleted: new Date('2026-08-20T10:00:00.000Z') }))
+
+		try {
+			await funUserDel(userId)
+			expect.unreachable('a closed account was expected to be refused')
+		} catch (e) {
+			expect((e as GraphQLError).extensions.description).toBe('account already closed')
+		}
+	})
+
+	// ⚠️ **`disabled` is not a gate here, and this is the one write on the tier where it is not.**
+	// Suspension is a platform decision about what somebody may do; the right to erasure is not
+	// something the platform suspends. The document and its `disabled` flag both stay where they are.
+	it('lets a suspended customer close their account anyway', async () => {
+		userFindById.mockReturnValueOnce(reading({ _id: userId, disabled: true }))
+
+		await expect(funUserDel(userId)).resolves.toBeUndefined()
+		expect(userUpdateOne).toHaveBeenCalledOnce()
+		expect(checkUserAuthorizationDisDel).not.toHaveBeenCalled()
+	})
+
+	// `matchedCount`, not `modifiedCount`: the guard above proved the document exists and is live, so
+	// a filter matching nothing means it went away between the two queries — and the customer must not
+	// be told their account is closed when it is not.
+	it('answers 500 when the filter matched nothing', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+
+		expect(await rejection(funUserDel(userId))).toEqual({ title: 'Internal Server Error', status: 500 })
 	})
 })
 

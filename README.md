@@ -6,15 +6,15 @@ endpoint `/user-authenticated-resource`.
 Token lifecycle is not here; it lives in `marketplace-dev-user-authenticated-authorization` (4031), and
 logout in `marketplace-dev-authenticated-logout` (4030), which all three tiers share unchanged.
 
-The whole surface is one query and six mutations — `me`, a personal-data write, four address operations
-and a password change — and every one of them acts on the account the request is authenticated as. The
-operation table, and the four ways this service deliberately differs from its ShopOwner original, are in
-[`CLAUDE.md`](./CLAUDE.md).
+The whole surface is two queries and seven mutations — `me`, a GDPR Art. 20 export, a personal-data write,
+four address operations, a password change and closing the account — and every one of them acts on the
+account the request is authenticated as. The operation table, and the four ways this service deliberately
+differs from its ShopOwner original, are in [`CLAUDE.md`](./CLAUDE.md).
 
 ## The suite
 
-Sixteen files, 309 tests, 100% on all four coverage metrics and a 100.00 mutation score — eleven unit
-files (249 tests) plus five `*.itest.mts` (60 tests). The "skip all tests" instruction this repo was built
+Twenty-one files, 419 tests, 100% on all four coverage metrics and a 100.00 mutation score — sixteen unit
+files (348 tests) plus five `*.itest.mts` (71 tests). The "skip all tests" instruction this repo was built
 under was revoked by the user on 2026-08-06; the suite was written from the harness up and both gates
 pass, so a commit here needs no `--no-verify`.
 
@@ -50,8 +50,8 @@ since every `globalSetup` drops its own database.
 
 |File|Covers|
 |---|---|
-|`index.itest.mts`|the bearer gate against a live Redis session (412 / 499 / 498 / **403** for another tier and for a session with no `tier` at all), the `x-introspectioncode` bypass, CSRF on GET, a full `me` selection, and a secret-non-leak check that no hash reaches the wire|
-|`account.itest.mts`|`userPersonalDataUpdate` and `userUpdatePwd` against the real validator — including a raw-driver counter-proof that `contacts: { mobile: null }` is refused with `code: 121` while a real number is accepted, and real bcrypt on both sides of the password change|
+|`index.itest.mts`|the bearer gate against a live Redis session (412 / 499 / 498 / **403** for another tier and for a session with no `tier` at all), the `x-introspectioncode` bypass, CSRF on GET, a full `me` selection, a secret-non-leak check that no hash reaches the wire, and the same pair for `userExport` — the decrypted round-trip including the two login timestamps, and a body scan that additionally refuses `emailVerify.newEmailTmp`, the one encrypted value a widened projection would hand back in plaintext|
+|`account.itest.mts`|`userPersonalDataUpdate` and `userUpdatePwd` against the real validator — including a raw-driver counter-proof that `contacts: { mobile: null }` is refused with `code: 121` while a real number is accepted, and real bcrypt on both sides of the password change; plus `userDel` — the `deleted` stamp accepted by the `$expr` clause on a document that carries a `defaultAddress`, the caller's key really gone from the cluster, 498 from the token layer on the second call, the resolver's own 410 when a session outlives the close, and a suspended customer closing anyway|
 |`addresses.itest.mts`|the three address mutations plus `userDefaultAddressSet`, including the six-address cap — six accepted through the real mutation, the seventh answered 400 — and a block that drives the collection validator directly: `$pull` of the default rejected, `$pull` of a non-default accepted, a foreign pointer rejected, a pointer with no `addresses` rejected, a seventh address rejected on insert and on `$push`|
 |`shutdown.itest.mts`|`gracefulShutdown`, the process-level handlers, production introspection refusal, and the 5s teardown budget lost for real against a local blackhole socket|
 |`startFailure.itest.mts`|`start()`'s catch arm with a URL MongoDB genuinely refuses, and the env guard running *outside* the try|
