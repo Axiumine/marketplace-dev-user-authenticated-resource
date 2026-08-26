@@ -382,9 +382,10 @@ describe('funUserDel', () => {
 		}
 	})
 
-	// ⚠️ **`disabled` is not a gate here, and this is the one write on the tier where it is not.**
-	// Suspension is a platform decision about what somebody may do; the right to erasure is not
-	// something the platform suspends. The document and its `disabled` flag both stay where they are.
+	// ⚠️ **`disabled` is not a gate here (ADR-036).** `funUserUpdatePwd` is the only lib function on this
+	// tier that gates on it, and it does so because re-keying an account is taking it over. Suspension is
+	// a platform decision about what somebody may do; the right to erasure is not something the platform
+	// suspends. The document and its `disabled` flag both stay where they are.
 	it('lets a suspended customer close their account anyway', async () => {
 		userFindById.mockReturnValueOnce(reading({ _id: userId, disabled: true }))
 

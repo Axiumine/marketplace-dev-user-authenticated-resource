@@ -42,8 +42,10 @@ export async function funUserUpdatePwd(_id: Types.ObjectId, passwordOld: string,
 		throwUnauthorizedError()
 	}
 
-	// Same gate every other authenticated path uses. A disabled or soft-deleted customer keeps a live
-	// access token until it expires, and must not be able to change the password on the way out.
+	// The same gate `loginUser` and every session refresh apply, applied once more here — and this is
+	// the only lib function on this tier that applies it. A disabled or soft-deleted customer keeps a
+	// live access token until it expires, and must not be able to re-key the account on the way out.
+	// Closing it is not the same act and is deliberately ungated: see `funUserDel` and ADR-036.
 	//
 	// ⚠️ It does **not** check `emailVerify.valid`, and it should not: that gate belongs to `loginUser`
 	// on 4028, which is the only path that mints a session in the first place. A customer holding a

@@ -26,10 +26,13 @@ import { Types } from 'mongoose'
  * rather than a permanent loss only *because* the purge is coming; until it ships, the wait is
  * forever, which is what makes that job load-bearing rather than tidy-up.
  *
- * ⚠️ **`disabled` is deliberately not a gate here, and this is the one write on the tier where it is
- * not.** Every other authenticated write runs `checkUserAuthorizationDisDel`, because a suspended
- * customer holding a live access token must not keep changing their account on the way out. Closing
- * the account is the exception: suspension is a platform decision about what somebody may do, and the
+ * ⚠️ **`disabled` is deliberately not a gate here (ADR-036), and `funUserUpdatePwd` is the only write
+ * on this tier where it is one.** Suspension is enforced at the edges of a session — `loginUser`
+ * refuses a suspended account outright, and `findAccountForSession` re-runs the check on every refresh
+ * — so a suspended customer holding a live access token reaches this resolver for up to one
+ * access-token lifetime, exactly as they reach the address and personal-data writes, which run no such
+ * check either. The password write adds its own guard because re-keying an account is taking it over;
+ * closing one is giving it up. Suspension is a platform decision about what somebody may do, and the
  * right to erasure is not something the platform suspends. A stamp on an already-suspended document
  * takes nothing away from an operator either — the document and its `disabled` flag are both still
  * there.

@@ -89,14 +89,17 @@ That pipeline is the only pipeline update in the workspace. Two traps in it, bot
   `new Types.ObjectId(oid)` deep-equals its argument, so with an ObjectId fixture the missing coercion is
   unobservable.
 
-⚠️ **`userDel` is the one write here that a suspended customer may still make, and the one that keeps
-an address occupied after it runs.** Two things about it that read as omissions and are not:
+⚠️ **`userDel` is not gated on `disabled`, and it keeps an address occupied after it runs.** Two things
+about it that read as omissions and are not:
 
-- **`disabled` is deliberately not a gate.** Every other write on this tier runs
-  `checkUserAuthorizationDisDel` and answers 401 to a suspended account; `funUserDel` checks only that
-  the document exists and is not already stamped. Suspension is a platform decision about what somebody
-  may *do*; the right to erasure is not something the platform suspends. `userLib.test.mts` pins the
-  absence of that call, so restoring it fails the suite rather than passing silently.
+- **`disabled` is deliberately not a gate (ADR-036).** ⚠️ **`funUserUpdatePwd` is the only lib function
+  here that calls `checkUserAuthorizationDisDel`** — one caller out of seven, which looks like rot and is
+  not. Suspension otherwise reaches a live session only at its edges: `loginUser` refuses it, and
+  `findAccountForSession` re-checks on every refresh, so a suspended customer with a live access token
+  still reaches every write on this service for up to one access-token lifetime. `funUserDel` checks only
+  that the document exists and is not already stamped. Suspension is a platform decision about what
+  somebody may *do*; the right to erasure is not something the platform suspends. `userLib.test.mts` pins
+  the absence of that call, so restoring it fails the suite rather than passing silently.
 - **The address stays taken for the retention window, not forever.** `login.email_unique` carries no
   `partialFilterExpression`, so a soft-deleted document still holds its address and the same person
   cannot re-register with it. What frees it is the 30-day purge decided in `phase1/NFR.md` open

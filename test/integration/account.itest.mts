@@ -479,10 +479,12 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 		}
 	})
 
-	// ⚠️ The one write on this tier that a suspended customer may still make. Every other one runs
-	// `checkUserAuthorizationDisDel` and answers 401; suspension is a platform decision about what
-	// somebody may do, and the right to erasure is not something the platform suspends.
-	it('lets a suspended customer close their account, unlike every other write here', async () => {
+	// ⚠️ Suspension does not reach this write (ADR-036). `funUserUpdatePwd` is the only lib function on
+	// this tier that runs `checkUserAuthorizationDisDel`; everything else relies on login and the
+	// per-refresh re-check, so a suspended customer with a live token gets here. Suspension is a platform
+	// decision about what somebody may do, and the right to erasure is not something the platform
+	// suspends.
+	it('lets a suspended customer close their account', async () => {
 		const user = await withSignedInUser({ disabled: true })
 
 		try {
