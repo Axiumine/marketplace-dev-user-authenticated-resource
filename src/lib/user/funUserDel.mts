@@ -14,17 +14,24 @@ import { Types } from 'mongoose'
  * schema path is a `Date` — mongoose casts it, exactly as `funCompanyDelete` and `funShopOwnerDelete`
  * do.
  *
- * ⚠️ **Erasure is the stamp, and the erasure is not finished by it.** The personal fields are still
- * in the document, encrypted, until the retention purge removes it 30 days after closure — a purge
- * that does not exist yet (`phase1/NFR.md` open question 6). Nothing here should be read as the whole
- * of Art. 17.
+ * ⚠️ **Erasure is the stamp, and the erasure is not finished by it.** The personal fields are still in
+ * the document, encrypted, until the retention purge removes it 30 days after closure. That purge is
+ * **`user.deleted_ttl`**, a TTL index over this very field
+ * (`marketplace-db-setup/migrations/20260301000300-create-user.js`), so the stamp written here is the
+ * decision to erase and the index is the erasure — there is no job to run and nothing to schedule.
+ * Two consequences worth knowing: the sweep is a background monitor that wakes roughly every 60
+ * seconds, so "30 days" is 30 days and change; and `deleted` is one of the few paths on this
+ * collection that is **not** encrypted, which is the only reason a server-side index can read it at
+ * all (ADR-029).
  *
- * ⚠️ **`login.email` stays occupied for those 30 days.** `login.email_unique` is a plain unique index
- * with no `partialFilterExpression`, so a closed account keeps its address and the same person cannot
- * register again with it until the purge removes the document — the same trade
- * `shopOwner.login.email_unique` and `company.vatNumber_unique` already make. It is a bounded wait
- * rather than a permanent loss only *because* the purge is coming; until it ships, the wait is
- * forever, which is what makes that job load-bearing rather than tidy-up.
+ * ⚠️ **`login.email` stays occupied until the document goes, and that is now the shorter of two
+ * clocks.** `login.email_unique` is a plain unique index with no `partialFilterExpression`, so a
+ * closed account keeps its address — the same trade `shopOwner.login.email_unique` and
+ * `company.vatNumber_unique` already make. What ends it is whichever comes first: the TTL at 30 days,
+ * or the same address being registered again, which destroys this document outright and opens a new
+ * account (`userRegister` on `marketplace-dev-public-resource`, ADR-011 §Amendment 2026-08-26). So
+ * closing an account costs its owner nothing if they come back, and the retention rule is a ceiling
+ * rather than a wait.
  *
  * ⚠️ **`disabled` is deliberately not a gate here (ADR-036), and `funUserUpdatePwd` is the only write
  * on this tier where it is one.** Suspension is enforced at the edges of a session — `loginUser`

@@ -423,8 +423,9 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 			expect(status).toBe(200)
 			expect(json.data).toEqual({ userDel: true })
 
-			// A soft delete: the document is still there, and so is everything in it. The purge that
-			// removes it 30 days after closure does not exist yet — `phase1/NFR.md` open question 6.
+			// A soft delete: the document is still there, and so is everything in it. What removes it is
+			// `user.deleted_ttl`, 30 days after this stamp — a TTL index rather than a job, and nothing
+			// this assertion can wait for. Re-registering the address destroys it sooner.
 			const stored = await readUser(user._id)
 			expect(stored?.deleted).toBeInstanceOf(Date)
 			expect(stored?.login.email).toBe(user.email)

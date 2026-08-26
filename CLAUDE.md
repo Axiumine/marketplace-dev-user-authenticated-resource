@@ -89,8 +89,8 @@ That pipeline is the only pipeline update in the workspace. Two traps in it, bot
   `new Types.ObjectId(oid)` deep-equals its argument, so with an ObjectId fixture the missing coercion is
   unobservable.
 
-⚠️ **`userDel` is not gated on `disabled`, and it keeps an address occupied after it runs.** Two things
-about it that read as omissions and are not:
+⚠️ **`userDel` is not gated on `disabled`, and it hands the address back on a clock rather than at
+once.** Two things about it that read as omissions and are not:
 
 - **`disabled` is deliberately not a gate (ADR-036).** ⚠️ **`funUserUpdatePwd` is the only lib function
   here that calls `checkUserAuthorizationDisDel`** — one caller out of seven, which looks like rot and is
@@ -100,11 +100,16 @@ about it that read as omissions and are not:
   that the document exists and is not already stamped. Suspension is a platform decision about what
   somebody may *do*; the right to erasure is not something the platform suspends. `userLib.test.mts` pins
   the absence of that call, so restoring it fails the suite rather than passing silently.
-- **The address stays taken for the retention window, not forever.** `login.email_unique` carries no
-  `partialFilterExpression`, so a soft-deleted document still holds its address and the same person
-  cannot re-register with it. What frees it is the 30-day purge decided in `phase1/NFR.md` open
-  question 6 — **which does not exist yet**: no TTL index, no scheduled job. Until it is built, closing
-  an account burns its email address permanently, and that is a gap rather than a design.
+- **The address stays taken for the retention window, and only for it.** `login.email_unique` carries
+  no `partialFilterExpression`, so a soft-deleted document still holds its address. What frees it is
+  **`user.deleted_ttl`** — the 30-day purge from `phase1/NFR.md` open question 6, shipped as a TTL
+  index over `deleted` in `marketplace-db-setup`, not as a job. So the stamp `funUserDel` writes *is*
+  the erasure order; MongoDB's background monitor carries it out about a minute late, and nothing on
+  this service runs. ⚠️ **Two indexes cover `deleted` on `user` and neither is redundant**:
+  `expireAfterSeconds` is single-field only, so `tbl_active_registeredAt` cannot carry it.
+  Re-registering the same address ends the wait early — `userRegister` on
+  `marketplace-dev-public-resource` destroys the closed document and opens a new account
+  (ADR-011 §Amendment 2026-08-26), which is the platform's one application hard delete.
 
 The already-closed branch answers **410**, not 401, and it is reachable only through a session that
 outlived the close — the ordinary second call is refused 498 by the token layer, because the first one
