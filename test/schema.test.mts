@@ -106,10 +106,11 @@ describe('schema', () => {
 		])
 	})
 
-	// ⚠️ There is no order, cart, delivery or payment mutation, and their absence is a fact about the
-	// platform rather than an omission in this schema: none of the four has a collection, a resolver
-	// or a design. A stub here would be the first half of an interface nobody has specified.
-	it('exposes nothing about ordering, which does not exist yet', () => {
+	// ⚠️ There is no order, cart, delivery or payment mutation, and their absence is a permanent fact
+	// about the platform rather than an omission in this schema: the four are permanently out of scope
+	// (ADR-038, 2026-08-27) and none has a collection, a resolver or a design. A stub here would be the
+	// first half of an interface nobody is going to specify.
+	it('exposes nothing about ordering, which does not exist and will not', () => {
 		for (const name of ['orderAdd', 'cartAdd', 'checkout', 'paymentIntent']) {
 			expect(fieldsOf('MutationsApi')).not.toContain(name)
 		}
