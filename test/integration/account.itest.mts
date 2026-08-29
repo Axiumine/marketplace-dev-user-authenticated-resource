@@ -350,7 +350,11 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 	// A disabled customer keeps a live access token until it expires, and must not be able to change
 	// the password on the way out. Checked before the comparison, so this costs no hash either.
 	it('answers 401 for a disabled account', async () => {
-		const user = await withSignedInUser({ disabled: true })
+		// ⚠️ The reason travels with the flag because the collection demands it: ADR-044 added
+		// `dependencies: { disabled: ['disabledReason'] }` to the validator, so a seed carrying the flag
+		// alone is refused by the server before the gate under test is ever reached. `seedUser` encrypts
+		// it on the way in like every other personal path, by spreading the overrides before it encrypts.
+		const user = await withSignedInUser({ disabled: true, disabledReason: 'itest suspension' })
 
 		try {
 			const { status, json } = await gql(change(CURRENT_PWD, 'newPassword2!'), user.headers)
@@ -423,9 +427,10 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 			expect(status).toBe(200)
 			expect(json.data).toEqual({ userDel: true })
 
-			// A soft delete: the document is still there, and so is everything in it. What removes it is
-			// `user.deleted_ttl`, 30 days after this stamp — a TTL index rather than a job, and nothing
-			// this assertion can wait for. Re-registering the address destroys it sooner.
+			// A soft delete: the document is still there, and so is everything in it. Nothing ever removes
+			// it (ADR-041) — at day 30 a sweeper in the admin service overwrites the personal paths in
+			// place, which is not a thing this assertion can wait for. Re-registering the address inside
+			// those 30 days hands this same document back instead (ADR-046).
 			const stored = await readUser(user._id)
 			expect(stored?.deleted).toBeInstanceOf(Date)
 			expect(stored?.login.email).toBe(user.email)
@@ -486,7 +491,7 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 	// decision about what somebody may do, and the right to erasure is not something the platform
 	// suspends.
 	it('lets a suspended customer close their account', async () => {
-		const user = await withSignedInUser({ disabled: true })
+		const user = await withSignedInUser({ disabled: true, disabledReason: 'itest suspension' })
 
 		try {
 			const { status, json } = await gql(CLOSE, user.headers)
