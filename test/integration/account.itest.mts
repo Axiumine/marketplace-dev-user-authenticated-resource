@@ -350,7 +350,11 @@ describe('userUpdatePwd (real bcrypt at cost 14)', () => {
 	// A disabled customer keeps a live access token until it expires, and must not be able to change
 	// the password on the way out. Checked before the comparison, so this costs no hash either.
 	it('answers 401 for a disabled account', async () => {
-		const user = await withSignedInUser({ disabled: true })
+		// ⚠️ The reason travels with the flag because the collection demands it: ADR-044 added
+		// `dependencies: { disabled: ['disabledReason'] }` to the validator, so a seed carrying the flag
+		// alone is refused by the server before the gate under test is ever reached. `seedUser` encrypts
+		// it on the way in like every other personal path, by spreading the overrides before it encrypts.
+		const user = await withSignedInUser({ disabled: true, disabledReason: 'itest suspension' })
 
 		try {
 			const { status, json } = await gql(change(CURRENT_PWD, 'newPassword2!'), user.headers)
@@ -486,7 +490,7 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 	// decision about what somebody may do, and the right to erasure is not something the platform
 	// suspends.
 	it('lets a suspended customer close their account', async () => {
-		const user = await withSignedInUser({ disabled: true })
+		const user = await withSignedInUser({ disabled: true, disabledReason: 'itest suspension' })
 
 		try {
 			const { status, json } = await gql(CLOSE, user.headers)

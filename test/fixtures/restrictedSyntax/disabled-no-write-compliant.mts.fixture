@@ -1,0 +1,28 @@
+// Every read shape this service depends on, and the one thing this rule must never refuse: the
+// enforcement itself. `checkUserAuthorizationDisDel` runs at login, `findAccountForSession` on every
+// refresh, and `funUserUpdatePwd` reads the flag here so a suspended customer cannot change the password
+// on an account they cannot use. A rule firing on a read would fire on the reason the flag works at all.
+
+// The projection funUserUpdatePwd really carries — a space-separated string, not an object.
+export const pwdProjection = '_id disabled deleted login.password'
+
+// The comparison the gate makes, and the destructure a caller writes over the document it just read.
+export const isSuspended = (user: Record<string, unknown>) => user.disabled === true
+
+export const suspensionOf = (user: { disabled?: boolean; disabledReason?: string }) => {
+	const { disabled, disabledReason } = user
+
+	return disabled === true ? disabledReason : undefined
+}
+
+// The interface the projection is typed against, where a widened read lands first.
+export interface IUserDisabledCheck {
+	disabled?: boolean
+	disabledReason?: string
+}
+
+// The one write this tier does perform, and the field the ban leaves alone: closing your own account.
+export const closure = { $set: { deleted: new Date() } }
+
+// Both names in prose, the way ADR-044 and this repo's own comments write them: disabled, disabledBy.
+export const boundary = 'the Admin tier owns disabled and disabledReason; this tier stamps deleted alone'

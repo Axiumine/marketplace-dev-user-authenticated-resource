@@ -1,0 +1,2 @@
+// A customer-tier service lifting the suspension standing against its own caller.
+export const update = { $set: { disabled: false } }

@@ -1,0 +1,4 @@
+// The document-instance form: a hydrated customer mutated in place, one `.save()` from a lifted sanction.
+export const clear = (user: Record<string, unknown>) => {
+	user.disabled = false
+}
