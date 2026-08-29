@@ -80,7 +80,7 @@ and no Keygrip here — the refresh cookie belongs to
 `marketplace-dev-user-authenticated-authorization` (4031), which is also what writes the session
 this one reads.
 
-**Two datasources, not three.** Unlike the shop-owner and operator resource services, `start()` does
+**Two datasources, not three.** Unlike the shop-owner and admin resource services, `start()` does
 not arm an antivirus: this tier accepts no uploads, so `graphql-upload`, `sharp` and `clamscan` are
 absent and there is no `initClamScan()` to fail. Nothing here needs clamd listening, and no test
 should mock one.
@@ -236,7 +236,7 @@ that cost the most to find there are latent in this code too, because it uses th
 Kept as rules, not as history:
 
 - **`sanitizeFilter` is on globally.** `MongoDBConnect` (koa-utils) sets
-  `mongoose.set('sanitizeFilter', true)`, so a bare `$`-operator object inside a filter is stripped
+  `mongoose.set('sanitizeFilter', true)`, so a bare `$`-admin object inside a filter is stripped
   and read as a literal value. `{ deleted: { $exists: false } }` written unwrapped answers
   `Cast to date failed for value "{ '$exists': false }" (type Object) at path "deleted"` at runtime and
   passes every unit test that mocks the model. Wrap it in mongoose's `trusted({ $exists: false })`, and

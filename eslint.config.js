@@ -9,7 +9,7 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort'
 const sharedTsBlock = eslintConfig.find((c) => c.files?.includes('src/**/*.{d.ts,ts,cts,mts}'))
 
 /*
- * ADR-044. Suspension is the operator's instrument end to end: the Admin tier raises it, and the Admin
+ * ADR-044. Suspension is the admin's instrument end to end: the Admin tier raises it, and the Admin
  * tier is the only hand that lifts it. A customer-tier service able to write any `disabled*` field could
  * clear a sanction standing against the very account making the request — the account this service
  * exists to let that person edit — which is why the ban belongs on this tier as much as on the shop
@@ -46,7 +46,7 @@ const DISABLED_NO_WRITE = [
 		selector:
 			'ObjectExpression > Property[key.name=/^disabled(By|Reason)?$/], ObjectExpression > Property[key.value=/^disabled(By|Reason)?$/], AssignmentExpression[left.property.name=/^disabled(By|Reason)?$/], AssignmentExpression[left.property.value=/^disabled(By|Reason)?$/]',
 		message:
-			"ADR-044: `disabled`, `disabledBy` and `disabledReason` are the Admin tier's to write, never this tier's — a service that could raise or clear a suspension could lift a sanction standing against itself, and the platform owner's ruling is that only an operator removes one. A self-service closure stamps `deleted` and stops. The reads stay legal: checkUserAuthorizationDisDel at login and findAccountForSession on every refresh are what enforce the flag."
+			"ADR-044: `disabled`, `disabledBy` and `disabledReason` are the Admin tier's to write, never this tier's — a service that could raise or clear a suspension could lift a sanction standing against itself, and the platform owner's ruling is that only an admin removes one. A self-service closure stamps `deleted` and stops. The reads stay legal: checkUserAuthorizationDisDel at login and findAccountForSession on every refresh are what enforce the flag."
 	}
 ]
 

@@ -39,7 +39,7 @@ import { Types } from 'mongoose'
  *
  * ⚠️ **The undo is not a way around a suspension.** A restore leaves `disabled`, `disabledBy` and
  * `disabledReason` exactly as it found them (ADR-046, ADR-044), so an account suspended and then closed
- * comes back suspended and still cannot log in. Only an operator lifts one.
+ * comes back suspended and still cannot log in. Only an admin lifts one.
  *
  * ⚠️ **`disabled` is deliberately not a gate here (ADR-036), and `funUserUpdatePwd` is the only write
  * on this tier where it is one.** Suspension is enforced at the edges of a session — `loginUser`
@@ -49,7 +49,7 @@ import { Types } from 'mongoose'
  * check either. The password write adds its own guard because re-keying an account is taking it over;
  * closing one is giving it up. Suspension is a platform decision about what somebody may do, and the
  * right to erasure is not something the platform suspends. A stamp on an already-suspended document
- * takes nothing away from an operator either — the document and its `disabled` flag are both still
+ * takes nothing away from an admin either — the document and its `disabled` flag are both still
  * there.
  *
  * A `null` document is 401, not 404: the session outlived the account, and the caller learns their

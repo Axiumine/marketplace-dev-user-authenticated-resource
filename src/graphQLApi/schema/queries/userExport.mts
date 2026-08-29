@@ -9,7 +9,7 @@ import { GraphQLNonNull } from 'graphql'
  * and for the same reason: the session is the only identity on this tier.
  *
  * ⚠️ **Portability is self-service and single-customer, decided 2026-08-26, and the shape is load
- * bearing.** An operator-facing export — "hand me every customer's record", or worse, a search over
+ * bearing.** An admin-facing export — "hand me every customer's record", or worse, a search over
  * them — would need `user` to be readable across accounts, which is exactly what ADR-029 refuses and
  * what `ADR-INDEX.md` §4 lists among the decisions not to re-open. One person decrypting one document
  * that is already theirs asks nothing of the encryption scheme.

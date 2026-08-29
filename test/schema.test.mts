@@ -72,7 +72,7 @@ describe('schema', () => {
 	})
 
 	// ⚠️ **`userExport` takes none either, and that is what makes portability self-service.** An
-	// argument here would be the first half of an operator-facing export, which is the shape ADR-029
+	// argument here would be the first half of an admin-facing export, which is the shape ADR-029
 	// refuses: reading across accounts would need `user` to be searchable, and it deliberately is not.
 	it.each([['me'], ['userExport']])('%s takes no arguments, because the session is the only identity', (name) => {
 		expect(argsOf('QueriesApi', name)).toEqual([])

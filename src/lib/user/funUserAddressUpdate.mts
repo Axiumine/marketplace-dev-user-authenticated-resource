@@ -6,7 +6,7 @@ import { Types } from 'mongoose'
 /**
  * Replaces one element of `addresses` in place.
  *
- * Uses the positional `$` operator, which needs the array named in the *filter* to know which element
+ * Uses the positional `$` admin, which needs the array named in the *filter* to know which element
  * it points at — `'addresses._id': addressId` is not a redundant re-check of the guard that already
  * ran, it is what makes `addresses.$` resolvable at all.
  *

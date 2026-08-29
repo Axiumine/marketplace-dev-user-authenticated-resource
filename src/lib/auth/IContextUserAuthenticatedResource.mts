@@ -4,7 +4,7 @@ import { IncomingHttpHeaders } from 'http'
 
 /**
  * ⚠️ `state.user` is the **customer**, not "the user" in the generic sense. Every tier calls this
- * slot `user` — the Admin service puts an operator in it and the ShopOwner service a shop owner —
+ * slot `user` — the Admin service puts an admin in it and the ShopOwner service a shop owner —
  * because it is Koa's conventional name for "whoever this request is authenticated as". Here it
  * happens to be the `user` collection as well, which is a coincidence of naming and not a rule.
  *
