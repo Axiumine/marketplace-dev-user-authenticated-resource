@@ -427,9 +427,10 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 			expect(status).toBe(200)
 			expect(json.data).toEqual({ userDel: true })
 
-			// A soft delete: the document is still there, and so is everything in it. What removes it is
-			// `user.deleted_ttl`, 30 days after this stamp — a TTL index rather than a job, and nothing
-			// this assertion can wait for. Re-registering the address destroys it sooner.
+			// A soft delete: the document is still there, and so is everything in it. Nothing ever removes
+			// it (ADR-041) — at day 30 a sweeper in the admin service overwrites the personal paths in
+			// place, which is not a thing this assertion can wait for. Re-registering the address inside
+			// those 30 days hands this same document back instead (ADR-046).
 			const stored = await readUser(user._id)
 			expect(stored?.deleted).toBeInstanceOf(Date)
 			expect(stored?.login.email).toBe(user.email)

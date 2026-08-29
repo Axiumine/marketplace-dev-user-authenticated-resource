@@ -15,23 +15,31 @@ import { Types } from 'mongoose'
  * do.
  *
  * ⚠️ **Erasure is the stamp, and the erasure is not finished by it.** The personal fields are still in
- * the document, encrypted, until the retention purge removes it 30 days after closure. That purge is
- * **`user.deleted_ttl`**, a TTL index over this very field
- * (`marketplace-db-setup/migrations/20260301000300-create-user.js`), so the stamp written here is the
- * decision to erase and the index is the erasure — there is no job to run and nothing to schedule.
- * Two consequences worth knowing: the sweep is a background monitor that wakes roughly every 60
- * seconds, so "30 days" is 30 days and change; and `deleted` is one of the few paths on this
- * collection that is **not** encrypted, which is the only reason a server-side index can read it at
- * all (ADR-029).
+ * the document, encrypted, until the day-30 scrub overwrites them in place. **Nothing removes the
+ * document, ever** (ADR-041): `user.deleted_ttl` was dropped along with `purgeClosedUser`, because a TTL
+ * index can only delete a whole document and cannot modify a field, and the record that this person once
+ * held an account is not the platform's to erase. What survives is `_id`, `deleted`, `deletedBy`, the
+ * `disabled*` trio, the registration date and `scrubbedAt` — enough to answer *there was an account, it
+ * closed on this date, at whose instruction* and nothing more.
  *
- * ⚠️ **`login.email` stays occupied until the document goes, and that is now the shorter of two
- * clocks.** `login.email_unique` is a plain unique index with no `partialFilterExpression`, so a
+ * So the erasure is a job now, and that is the price of the reversal: a sweeper on an interval inside
+ * `marketplace-dev-admin-authenticated-resource`, under a single-key Redis `SET NX PX` lock so a
+ * multi-instance deployment scrubs once. `deleted` is still one of the few paths on this collection that
+ * is **not** encrypted (ADR-029) — that is what lets the sweeper's query find these documents at all.
+ *
+ * ⚠️ **`login.email` stays occupied until the scrub changes its value, and those thirty days are an undo
+ * window (ADR-046).** `login.email_unique` is a plain unique index with no `partialFilterExpression`, so a
  * closed account keeps its address — the same trade `shopOwner.login.email_unique` and
- * `company.vatNumber_unique` already make. What ends it is whichever comes first: the TTL at 30 days,
- * or the same address being registered again, which destroys this document outright and opens a new
- * account (`userRegister` on `marketplace-dev-public-resource`, ADR-011 §Amendment 2026-08-26). So
- * closing an account costs its owner nothing if they come back, and the retention rule is a ceiling
- * rather than a wait.
+ * `company.vatNumber_unique` already make. Two things end it. The scrub at day 30 overwrites the address
+ * with `deleted-${_id}@invalid.local`, unique by construction. Or the same person registers again inside
+ * the window, which **restores this document rather than replacing it**: the confirmed registration
+ * `$unset`s `deleted` and `deletedBy`, takes the password just chosen and stamps `emailVerify.valid`, on
+ * the same `_id` every foreign key already points at (`marketplace-dev-public-resource`, ADR-046). Closing
+ * an account is therefore undone by doing the obvious thing for thirty days, and is final after them.
+ *
+ * ⚠️ **The undo is not a way around a suspension.** A restore leaves `disabled`, `disabledBy` and
+ * `disabledReason` exactly as it found them (ADR-046, ADR-044), so an account suspended and then closed
+ * comes back suspended and still cannot log in. Only an operator lifts one.
  *
  * ⚠️ **`disabled` is deliberately not a gate here (ADR-036), and `funUserUpdatePwd` is the only write
  * on this tier where it is one.** Suspension is enforced at the edges of a session — `loginUser`
