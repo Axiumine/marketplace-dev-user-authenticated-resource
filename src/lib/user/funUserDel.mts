@@ -1,8 +1,7 @@
 import { throwGoneError } from '@axiumine/koa-utils/graphQL/throw/throwGoneError'
-import { throwInternalError } from '@axiumine/koa-utils/graphQL/throw/throwInternalError'
 import { throwUnauthorizedError } from '@axiumine/koa-utils/graphQL/throw/throwUnauthorizedError'
 import { User } from '@axiumine/marketplace-common/models/MongoDB/User'
-import { Types } from 'mongoose'
+import { trusted, Types } from 'mongoose'
 
 /**
  * Closes the authenticated customer's own account (GDPR Art. 17).
@@ -10,9 +9,10 @@ import { Types } from 'mongoose'
  * **A soft delete, like every other delete on this platform.** The document stays and gains a
  * `deleted` instant; `checkUserAuthorization` already refuses a stamped account on the login path
  * (`marketplace-dev-public-authorization`, `tryLoginUser`), so this one write is what shuts the
- * account, and the mutation revokes the live sessions on top of it. `Date.now()` is a number and the
- * schema path is a `Date` — mongoose casts it, exactly as `funCompanyDelete` and `funShopOwnerDelete`
- * do.
+ * account, and the mutation revokes the live sessions on top of it. `new Date()` rather than
+ * `Date.now()`: the retention sweep compares `deleted` against a cutoff and the model's path is a
+ * `Date`, so mongoose casts a number on the way out and reads it back as a `Date` either way — this
+ * just stops the two spellings existing, as `funShopOwnerDel` already does.
  *
  * ⚠️ **Erasure is the stamp, and the erasure is not finished by it.** The personal fields are still in
  * the document, encrypted, until the day-30 scrub overwrites them in place. **Nothing removes the
@@ -52,33 +52,39 @@ import { Types } from 'mongoose'
  * takes nothing away from an admin either — the document and its `disabled` flag are both still
  * there.
  *
- * A `null` document is 401, not 404: the session outlived the account, and the caller learns their
- * session is no good and nothing more — the same answer `me` and `funUserUpdatePwd` give.
+ * ⚠️ **`deleted: {$exists: false}` is a CLAUSE OF THE FILTER, and that is what makes the clock start
+ * once.** This used to read the document first and write unconditionally, which is two round trips with
+ * a window between them — two closes fired at once both saw a live account and both wrote, and the
+ * second stamp pushed the day-30 scrub thirty days further out, postponing the erasure the first one
+ * promised. Same shape and same argument as the address cap in `funUserAddressAdd`, and the same clause
+ * `funShopOwnerDel` and the admin tier's `funUserDelete` carry. `trusted()` is not optional:
+ * `sanitizeFilter` is on process-wide and rewrites a bare `{$exists: false}` into
+ * `{$eq: {$exists: false}}`, which matches no document at all and would refuse every closure.
  *
- * An account already stamped is 410, and that is not 401 by accident: on this tier a 401 means "your
- * session is no longer good", which is precisely what it is *not* here. In practice this branch is
- * nearly unreachable — the first call revoked every session, so the second request is refused by the
- * auth middleware before any resolver runs — and it exists for the window where the write landed and
- * the revoke did not.
+ * ⚠️ **The read happens only when the write matched nothing, and it exists to name which refusal this
+ * is.** `matchedCount !== 1` has exactly two causes and they get different answers. A `null` document is
+ * 401, not 404: the session outlived the account, and the caller learns their session is no good and
+ * nothing more — the same answer `me` and `funUserUpdatePwd` give. A document that is there is one
+ * already stamped, and that is 410 rather than the 401 every other refusal on this tier answers: a 401
+ * means "your session is no longer good", which is precisely what it is *not* here. In practice the
+ * second branch is nearly unreachable — the first call revoked every session, so the next request is
+ * refused by the auth middleware before any resolver runs — and it exists for the window where the write
+ * landed and the revoke did not.
  *
- * The write carries no `deleted` clause of its own: the guard above has already established the
- * document is live, and `matchedCount` — not `modifiedCount` — is what proves it landed, since a
- * re-stamp of the same instant is not a state this can reach.
+ * There is no 500 left to answer, and its absence is the point: the guarded write cannot match nothing
+ * for a third reason. `matchedCount`, not `modifiedCount` — a re-stamp of the same instant is not a
+ * state the filter can reach.
  */
 export async function funUserDel(_id: Types.ObjectId) {
-	const user = await User.findById(_id).select('_id deleted').lean()
-
-	if (user === null) {
-		throwUnauthorizedError()
-	}
-
-	if (user.deleted) {
-		throwGoneError('account already closed')
-	}
-
-	const ret = await User.updateOne({ _id: _id }, { $set: { deleted: Date.now() } }).exec()
+	const ret = await User.updateOne({ _id: _id, deleted: trusted({ $exists: false }) }, { $set: { deleted: new Date() } }).exec()
 
 	if (ret.matchedCount !== 1) {
-		throwInternalError()
+		const user = await User.findById(_id).select('_id').lean()
+
+		if (user === null) {
+			throwUnauthorizedError()
+		}
+
+		throwGoneError('account already closed')
 	}
 }
