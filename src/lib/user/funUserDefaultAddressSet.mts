@@ -7,7 +7,7 @@ import { Types } from 'mongoose'
  *
  * ⚠️ **One `$set`, and that is the entire argument for the pointer over a boolean on each element.**
  * With a per-address flag this would be "clear every other address, then set this one" — two writes,
- * or one with two operators, and a window in which zero or two addresses are default if anything
+ * or one with two admins, and a window in which zero or two addresses are default if anything
  * interleaves. Here "at most one default" is not a rule being maintained, it is a shape that cannot
  * express a second default, so there is nothing to clear and nothing to race.
  *

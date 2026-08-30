@@ -501,7 +501,7 @@ describe('userDel (soft delete + revoke, real collection + real Redis cluster)',
 
 			const stored = await readUser(user._id)
 			expect(stored?.deleted).toBeInstanceOf(Date)
-			// The flag stays: an operator's record of the suspension is not erased by the customer.
+			// The flag stays: an admin's record of the suspension is not erased by the customer.
 			expect(stored?.disabled).toBe(true)
 		} finally {
 			await user.cleanup()

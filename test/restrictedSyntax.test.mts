@@ -75,7 +75,7 @@ describe('the block stays silent on the shape the services carry', () => {
 /*
  * ADR-044, and a scoping rule rather than a ban.
  *
- * Suspension is the operator's instrument at both ends: the Admin tier raises it and the Admin tier is
+ * Suspension is the admin's instrument at both ends: the Admin tier raises it and the Admin tier is
  * the only hand that lifts it. A customer-tier service able to write any `disabled*` field could clear a
  * sanction standing against the very account it exists to let that person edit.
  *

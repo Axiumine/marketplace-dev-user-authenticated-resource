@@ -12,7 +12,7 @@ import { start } from '../../src/index.mts'
  * which is the point of doing it this way: the catch has to tear down a HALF-CONNECTED process, and
  * disconnectAllDatabases really closes that live Redis client on the way out.
  *
- * ⚠️ Unlike the shop-owner and operator resource services, there is nothing after the datasources to
+ * ⚠️ Unlike the shop-owner and admin resource services, there is nothing after the datasources to
  * fail differently — this tier mounts no `graphqlUploadKoa` and calls no `initClamScan`, because a
  * customer uploads nothing. The Promise.all is the whole of the risky part of boot.
  *

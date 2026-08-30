@@ -141,7 +141,7 @@ export async function createServer() {
 		await authorizationAuthenticatedResourceHandler()(ctx, next)
 	})
 
-	// ⚠️ **No `graphqlUploadKoa` and no `initClamScan`, unlike the two shop-owner/operator resource
+	// ⚠️ **No `graphqlUploadKoa` and no `initClamScan`, unlike the two shop-owner/admin resource
 	// services.** A customer uploads nothing: the private area is a profile and a list of addresses.
 	// The upload middleware is not free to mount — it takes over every multipart request before the
 	// body parser sees it — and the antivirus is a socket to clamd that would have to be running for

@@ -15,7 +15,7 @@ const MAX_PHONE = 12
  *
  * ⚠️ **Almost everything is optional here, where `IShopOwnerPersonalDataInput` requires the lot.** The
  * collection requires `firstName` and `lastName` and no more, and the difference is the tier: a shop
- * owner is onboarded by an operator collecting a full record, a customer types a name into a profile
+ * owner is onboarded by an admin collecting a full record, a customer types a name into a profile
  * page and leaves the rest for later. `birth` and `contacts` are nullable as well as optional, because
  * GraphQL sends an explicitly cleared object as `null`.
  *
