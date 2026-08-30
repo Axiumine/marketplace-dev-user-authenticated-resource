@@ -325,54 +325,76 @@ describe('funUserDel', () => {
 		userFindById.mockReturnValue(reading(live))
 	})
 
-	// The stamp, and nothing else in the write. `Date.now()` is a number and the schema path is a
-	// `Date` — mongoose casts it, which is why the assertion is on the type and not on a Date instance.
-	// The filter carries no `deleted` clause of its own: the guard below has already established the
-	// document is live.
-	it('stamps deleted on the account named by the session, and touches nothing else', async () => {
+	/*
+	 * ⚠️ The stamp, and the guard is a CLAUSE OF THE FILTER rather than a read before it — the same shape
+	 * `funUserAddressAdd` uses for the address cap, and for the same reason: read-then-write is two round
+	 * trips with a window between them, and two closes fired at once would both see a live account and
+	 * both write. The second stamp would push the day-30 scrub thirty days further out and postpone the
+	 * erasure the first one promised. `trusted`, and the deep-equal is what pins it: `sanitizeFilter`
+	 * rewrites an untrusted `{$exists: false}` into `{$eq: {$exists: false}}`, which matches no document
+	 * and would refuse every closure.
+	 *
+	 * `new Date()` and not `Date.now()`, so the collection holds one spelling of the instant — the same
+	 * call `funShopOwnerDel` and the admin tier's `funUserDelete` make.
+	 */
+	it('stamps deleted in one guarded write, and touches nothing else', async () => {
 		await expect(funUserDel(userId)).resolves.toBeUndefined()
 
 		const [filter, update] = userUpdateOne.mock.calls[0]
 		expect(userUpdateOne).toHaveBeenCalledOnce()
-		expect(filter).toEqual({ _id: userId })
+		expect(filter).toEqual({ _id: userId, deleted: trusted({ $exists: false }) })
 		expect(Object.keys(update)).toEqual(['$set'])
 		expect(Object.keys(update.$set)).toEqual(['deleted'])
-		expect(typeof update.$set.deleted).toBe('number')
+		expect(update.$set.deleted).toBeInstanceOf(Date)
 	})
 
 	// ⚠️ A soft delete: `updateOne`, never `deleteOne`. The mocked `User` deliberately carries no
 	// `deleteOne` at all, so a regression to a hard delete fails here as a TypeError rather than
-	// passing every assertion and removing a document on a real collection.
-	it('reads only the two fields it needs to decide', async () => {
+	// passing every assertion and removing a document on a real collection. And nothing is read on the
+	// way in: one round trip closes an account.
+	it('reads nothing when the write landed', async () => {
 		await funUserDel(userId)
 
-		expect(userFindById).toHaveBeenCalledExactlyOnceWith(userId)
-		expect(userFindById.mock.results[0].value.select).toHaveBeenCalledExactlyOnceWith('_id deleted')
+		expect(userFindById).not.toHaveBeenCalled()
 	})
 
 	// 401 and not 404: the session outlived the account, and the caller learns their session is no
 	// good and nothing more — the same answer `me` and `funUserUpdatePwd` give.
 	it('answers 401 when the session outlived the account', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
 		userFindById.mockReturnValueOnce(reading(null))
 
 		expect(await rejection(funUserDel(userId))).toEqual({ title: 'Unauthorized', status: 401 })
-		expect(userUpdateOne).not.toHaveBeenCalled()
 	})
 
-	// ⚠️ 410 rather than the 401 every other refusal on this tier answers, deliberately: a 401 means
-	// "your session is no longer good", which is exactly what this is not. In practice the branch is
-	// nearly unreachable — the first call revoked every session — and it exists for the window where
-	// the write landed and the revoke did not.
-	it('answers 410 for an account already closed, without writing again', async () => {
-		userFindById.mockReturnValueOnce(reading({ _id: userId, deleted: new Date('2026-08-20T10:00:00.000Z') }))
+	/*
+	 * ⚠️ 410 rather than the 401 every other refusal on this tier answers, deliberately: a 401 means
+	 * "your session is no longer good", which is exactly what this is not. This is also the second of two
+	 * closes racing each other — the filter refused the write, the clock did not move, and the document
+	 * is still there to say so. In practice the branch is nearly unreachable: the first call revoked
+	 * every session, and it exists for the window where the write landed and the revoke did not.
+	 */
+	it('answers 410 for an account already closed, without moving the retention clock', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
 
 		expect(await rejection(funUserDel(userId))).toEqual({ title: 'Oops', status: 410 })
-		expect(userUpdateOne).not.toHaveBeenCalled()
+		expect(userUpdateOne).toHaveBeenCalledOnce()
+	})
+
+	// The read that decides which refusal this is takes the one field it needs: `_id` proves the
+	// document is there, and `deleted` no longer has to be read because the filter already tested it.
+	it('reads only the field it needs to tell the two refusals apart', async () => {
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+
+		await rejection(funUserDel(userId))
+
+		expect(userFindById).toHaveBeenCalledExactlyOnceWith(userId)
+		expect(userFindById.mock.results[0].value.select).toHaveBeenCalledExactlyOnceWith('_id')
 	})
 
 	// The envelope of a 410 says nothing about which 410 it is, so the text carries the whole meaning.
 	it('names the reason in the refusal, since the envelope does not', async () => {
-		userFindById.mockReturnValueOnce(reading({ _id: userId, deleted: new Date('2026-08-20T10:00:00.000Z') }))
+		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
 
 		try {
 			await funUserDel(userId)
@@ -385,22 +407,14 @@ describe('funUserDel', () => {
 	// ⚠️ **`disabled` is not a gate here (ADR-036).** `funUserUpdatePwd` is the only lib function on this
 	// tier that gates on it, and it does so because re-keying an account is taking it over. Suspension is
 	// a platform decision about what somebody may do; the right to erasure is not something the platform
-	// suspends. The document and its `disabled` flag both stay where they are.
+	// suspends. The document and its `disabled` flag both stay where they are — the filter names
+	// `deleted` and nothing else, which is what keeps this true.
 	it('lets a suspended customer close their account anyway', async () => {
-		userFindById.mockReturnValueOnce(reading({ _id: userId, disabled: true }))
-
 		await expect(funUserDel(userId)).resolves.toBeUndefined()
+
 		expect(userUpdateOne).toHaveBeenCalledOnce()
+		expect(userUpdateOne.mock.calls[0][0]).not.toHaveProperty('disabled')
 		expect(checkUserAuthorizationDisDel).not.toHaveBeenCalled()
-	})
-
-	// `matchedCount`, not `modifiedCount`: the guard above proved the document exists and is live, so
-	// a filter matching nothing means it went away between the two queries — and the customer must not
-	// be told their account is closed when it is not.
-	it('answers 500 when the filter matched nothing', async () => {
-		updateExec.mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
-
-		expect(await rejection(funUserDel(userId))).toEqual({ title: 'Internal Server Error', status: 500 })
 	})
 })
 
