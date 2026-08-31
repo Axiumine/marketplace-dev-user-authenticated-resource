@@ -327,7 +327,7 @@ describe('userUpdatePwd', () => {
 	})
 
 	/*
-	 * ⚠️ **Every session ends, and only after the write landed** (E15-S05). A password change made because
+	 * ⚠️ **Every session ends, and only after the write landed**. A password change made because
 	 * someone else is believed to be inside the account is the remedy it appears to be only if the
 	 * intruder's session dies with it — and the order is the other half: revoking first would log a
 	 * customer out of every device for a change that then failed validation.

@@ -77,8 +77,8 @@ describe('endEverySession', () => {
 	it('revokes every session the account holds, the caller’s included', async () => {
 		await endEverySession(ctx())
 
-		// Twice, both on the user index: the second is E17-S04's re-read, which is what licenses the delete of
-		// the index key at the end.
+		// Twice, both on the user index: the second is the revoke routine's re-read, which is what licenses
+		// the delete of the index key at the end.
 		expect(hKeys.mock.calls).toEqual([[`${REDIS_KEY}idx:user:${ACCOUNT_ID}`], [`${REDIS_KEY}idx:user:${ACCOUNT_ID}`]])
 		expect(del.mock.calls.map(([key]) => key)).toContain(`${REDIS_KEY}${CALLER_REFRESH_FIELD}`)
 		expect(del.mock.calls.slice(FIELDS.length, FIELDS.length * 2).flat()).toEqual(SESSION_KEYS)
@@ -115,7 +115,7 @@ describe('endEverySession', () => {
 	 * ⚠️ **Both of the caller's keys, not only the refresh one.** A revoke that dropped the refresh session
 	 * alone would leave the caller — and therefore an attacker who has just been handed the new password —
 	 * working until the access token expired on its own, which is exactly the window the change was made to
-	 * close. One key shape, since E13-S10: the raw-token shape this used to delete alongside the digest is
+	 * close. One key shape, and one only: the raw-token shape this used to delete alongside the digest is
 	 * unwritable and unreadable, so deleting it would be a round trip against a key that cannot exist.
 	 */
 	it('deletes the caller’s access session, under the digest and not under the token', async () => {
@@ -157,7 +157,7 @@ describe('endEverySession', () => {
 	 * ⚠️ **A login landing mid-revoke does not survive the teardown**, asserted at the call site rather than
 	 * left to the shared routine's own suite — this is the scenario the mutation exists for. The customer
 	 * changes their password because someone else is in the account, and that someone logs in again between
-	 * the index read and its delete. E17-S04's re-read ends the second session too, and the index key
+	 * the index read and its delete. The routine's re-read ends the second session too, and the index key
 	 * survives until it has: deleting it there would leave a live session nothing could name.
 	 */
 	it('revokes a session that appeared during the revoke, and keeps the index until it has', async () => {
@@ -214,7 +214,7 @@ describe('endEverySession', () => {
 
 	// An account whose sessions have all expired revokes quietly: `hKeys` on a missing key answers an empty
 	// array, and there is then nothing to delete but the caller's own access key — one key, under its digest,
-	// since E13-S10 dropped the second delete that named the raw token.
+	// and never a second one naming the raw token.
 	it('still ends the caller’s access session when the index is empty', async () => {
 		hKeys.mockResolvedValueOnce([])
 

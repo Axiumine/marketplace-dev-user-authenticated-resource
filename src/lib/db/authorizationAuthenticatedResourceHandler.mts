@@ -26,13 +26,13 @@ export const authorizationAuthenticatedResourceHandler = () => async (ctx: ICont
 	const authorization = ctx.request.header?.authorization // access
 	// more detailed errors code instead of generic 401 unauthorized (tampering)
 	if (typeof authorization === 'undefined') {
-		// ⚠️ The environment gate is evaluated **before** the code is read (E13-S11). Outside `development`
+		// ⚠️ The environment gate is evaluated **before** the code is read. Outside `development`
 		// and `test` the bypass does not exist at all, and a caller sending the correct header gets exactly
 		// the error a caller sending nothing gets — a wrong code and a disabled feature must not be
 		// distinguishable from the outside. `INTROSPECTION_CODE` stays in REQUIRED_ENV_VARS regardless:
 		// unset, it stringifies to the literal `'undefined'`, and that word would be the bypass.
 		//
-		// The comparison is `constantTimeEquals`, never `===` (E13-S03): string equality stops at the first
+		// The comparison is `constantTimeEquals`, never `===`: string equality stops at the first
 		// differing character, and that gradient is a working oracle for the configured value.
 		if (
 			isIntrospectionBypassAllowed() &&
@@ -57,7 +57,7 @@ export const authorizationAuthenticatedResourceHandler = () => async (ctx: ICont
 		// keeps its `access:` prefix after the replace, so the empty case is unreachable.
 		const accessToken = authorization!.replace('Bearer ', '')
 
-		// Keyed by the digest of the prefixed token, and by nothing else since E13-S10 removed the raw-key
+		// Keyed by the digest of the prefixed token, and by nothing else: there is no raw-key
 		// fallback. The `access:` prefix stays part of the hashed value: it is what tells an access hash from
 		// a refresh one, so it belongs inside the digest, not beside it.
 		const redAccessSession = await readSessionHash(redisClient, accessToken) // 'access:' already present
