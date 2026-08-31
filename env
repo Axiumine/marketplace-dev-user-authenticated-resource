@@ -106,7 +106,7 @@ NODE_ENV=development
 #
 # ⚠️ Three of those reasons turned out to be platform-wide rather than tier-specific: REDIRECT_DOMAIN,
 # SAMESITE_COOKIE and HIT_STATS are read by no `src/` file in any of the nine services and by no
-# `dist/` file in either @axiumine package, so E18-S13 took them out of the other eight templates too.
+# `dist/` file in either @axiumine package, so they came out of the other eight templates too.
 # SAMESITE_COOKIE in particular never set the refresh cookie's SameSite attribute anywhere — that is
 # the literal `sameSite: 'Strict'` in @axiumine/koa-utils/dist/lib/tokenOptions.mjs. This file was
 # right about all three before the rest of the platform was.
@@ -121,7 +121,7 @@ NODE_ENV=development
 # Service-to-service bypass of the token check. Treat as a secret: never log it, never let it reach a
 # browser client. It must be SET — an unset one makes the comparison `'undefined' === 'undefined'` for
 # any caller who sends that literal string.
-# ⚠️ Development-only, and the gate is code rather than convention (E13-S11): the
+# ⚠️ Development-only, and the gate is code rather than convention: the
 # `x-introspectioncode` header is honoured only when NODE_ENV is exactly `development` or `test`, and
 # refused under every other value — unset, empty, `staging`, `Production`, a typo. In production it
 # does nothing at all, and a request carrying it is answered exactly as one carrying nothing.

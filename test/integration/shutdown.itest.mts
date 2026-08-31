@@ -56,7 +56,7 @@ describe('production hardening actually applies to a real server', () => {
 	 *
 	 * This service gates every request behind authorizationAuthenticatedResourceHandler BEFORE it
 	 * reaches Apollo, so a bare request is refused at 412 and never touches the validation rules at
-	 * all. This test used to get past that gate with the `x-introspectioncode` header; since E13-S11
+	 * all. This test used to get past that gate with the `x-introspectioncode` header. Today
 	 * that header does nothing outside `development` and `test`, and the whole point of booting this
 	 * server is that it is neither. So the request carries a real session instead — one access hash in
 	 * the live Redis, exactly as a logged-in caller would — which also makes the assertion stronger:

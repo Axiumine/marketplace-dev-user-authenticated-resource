@@ -18,10 +18,10 @@ import { describe, expect, it } from 'vitest'
 
 const FIXTURES = new URL('./fixtures/restrictedSyntax/', import.meta.url)
 
-const TLS_MESSAGE = 'E12-S04: certificate verification stays on.'
-const PII_MESSAGE = 'E12-S04: the blanket Sentry PII flag is absent by decision, not set to false.'
-const BODY_MESSAGE = 'E12-S21: the request body is never captured.'
-const HOOKS_MESSAGE = 'E12-S22: `beforeSend` and `beforeSendTransaction` are wired together or not at all.'
+const TLS_MESSAGE = 'certificate verification stays on.'
+const PII_MESSAGE = 'the blanket Sentry PII flag is absent by decision, not set to false.'
+const BODY_MESSAGE = 'the request body is never captured.'
+const HOOKS_MESSAGE = '`beforeSend` and `beforeSendTransaction` are wired together or not at all.'
 
 const DISABLED_MESSAGE = 'ADR-044: `disabled`, `disabledBy` and `disabledReason` are the Admin tier'
 
@@ -86,7 +86,7 @@ describe('the block stays silent on the shape the services carry', () => {
  * closing your own account is the right ADR-036 protects.
  */
 describe('the disabled* write ban is scoped to src/**', () => {
-	// Four write shapes, because a `Property`-only rule passes the assignment the E12-S04 audit actually
+	// Four write shapes, because a `Property`-only rule passes the assignment the telemetry audit actually
 	// found one selector over, and a quoted key parses to a `key.value` where the plain one has a `key.name`.
 	it.each([
 		'disabled-no-write-property',

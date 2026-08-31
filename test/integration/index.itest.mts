@@ -107,7 +107,7 @@ describe('bearer-token gate over HTTP', () => {
 	 */
 	it('answers 403 when the live session was minted for another tier', async () => {
 		const { _id } = await seedUser()
-		// The token first, the key from it — the key is a digest now (E13-S01) and no longer carries the
+		// The token first, the key from it — the key is a digest now and no longer carries the
 		// token to slice back out of it.
 		const token = `access:${randomUUID()}`
 		const key = sessionKey(token)
@@ -135,7 +135,7 @@ describe('bearer-token gate over HTTP', () => {
 	 */
 	it('answers 403 for a live session carrying no tier at all', async () => {
 		const { _id } = await seedUser()
-		// The token first, the key from it — the key is a digest now (E13-S01) and no longer carries the
+		// The token first, the key from it — the key is a digest now and no longer carries the
 		// token to slice back out of it.
 		const token = `access:${randomUUID()}`
 		const key = sessionKey(token)
