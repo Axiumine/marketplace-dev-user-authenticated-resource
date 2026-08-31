@@ -29,8 +29,10 @@ import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthent
  * working for up to 91 minutes. The explicit delete below is therefore no longer the only thing closing
  * that window — it is the floor under it: a session minted before the field existed carries no bound key.
  *
- * The missing-header branch is the introspection bypass, which reaches a resolver with no session at
- * all: there is no caller to log out, so there is no key to delete.
+ * The missing-header branch keeps this helper total rather than trusting a caller two layers away: the
+ * authorization handler refuses a request with no `Authorization` header before any resolver runs, and a
+ * key derived from a header that is not there would be the digest of the empty string — a key belonging to
+ * nobody, deleted with a success reported.
  */
 export async function endEverySession(ctx: IContextUserAuthenticatedResource) {
 	await revokeAllSessionsForAccount({ store: redisClient, tier: TIER.user, accountId: `${ctx.state.user._id}` })

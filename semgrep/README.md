@@ -18,7 +18,7 @@ Output is written as your own UID (`-u`), so no root-owned files.
 
 | Path | What |
 |---|---|
-| `custom.yml` | Marketplace-specific rules (secret-in-logs guards) |
+| `custom.yml` | Marketplace-specific rule (secret-in-logs guard) |
 | `vendor/typescript.yml` | Vendored registry pack `p/typescript` (74 rules) |
 | `vendor/secrets.yml` | Vendored registry pack `p/secrets` (52 rules) |
 | `vendor/refresh.sh` | Re-download the vendored packs (manual snapshot update) |
@@ -26,11 +26,9 @@ Output is written as your own UID (`-u`), so no root-owned files.
 The yarn scripts pass `--config semgrep/`, which loads every rule file in this
 directory (custom + vendored) in one shot.
 
-`custom.yml` carries **two** rules — `marketplace-no-log-introspection-code` and
-`marketplace-no-log-auth-token` — guarding the two secrets this User-tier
-resource service actually handles: the `x-introspectioncode` service-to-service
-bypass header and the opaque `Bearer access:<token>` this service validates
-against Redis on every request (see
+`custom.yml` carries **one** rule — `marketplace-no-log-auth-token` — guarding the
+single secret this User-tier resource service actually handles: the opaque
+`Bearer access:<token>` it validates against Redis on every request (see
 `src/lib/db/authorizationAuthenticatedResourceHandler.mts`). It does **not**
 carry `marketplace-no-log-reset-secret`: that rule guards the password-reset flow,
 which lives only in `marketplace-dev-public-authorization` (the one tier reachable
@@ -55,8 +53,8 @@ entire service is written in `.mts` (ESM → `.mjs`). Verified empirically:
 
 | Invocation | Rules that run |
 |---|---|
-| `semgrep scan --config … src` (plain) | **36** of 123 — only `<multilang>`; every TypeScript rule is skipped |
-| current setup (`--scan-unknown-extensions` + explicit files) | **121** — TS + secrets + custom all run |
+| `semgrep scan --config … src` (plain) | **36** of 122 — only `<multilang>`; every TypeScript rule is skipped |
+| current setup (`--scan-unknown-extensions` + explicit files) | **120** — TS + secrets + custom all run |
 
 Cause: semgrep selects a parser by file extension; `.mts` maps to nothing, so
 the file is treated as generic and all `typescript`/`javascript` rules are
@@ -90,8 +88,8 @@ are missing. GitNexus has the same `.mts` gap on this platform.)
   file once per rule-language; a `.mts` parsed as JS (or vice-versa) partially
   fails, dragging the aggregate metric down. It is not a real parse failure of
   the TypeScript rules.
-- **Language coverage is deliberately narrow:** TypeScript + secrets + the two
-  custom rules. Other-language rule families (python, java, go, …) are excluded
+- **Language coverage is deliberately narrow:** TypeScript + secrets + the one
+  custom rule. Other-language rule families (python, java, go, …) are excluded
   by design via the targeted vendored packs.
 - If semgrep ever ships native `.mts` support, drop `--scan-unknown-extensions`
   and pass `src` directly; the coverage caveats above go away.

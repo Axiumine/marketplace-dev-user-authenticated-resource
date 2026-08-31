@@ -62,7 +62,7 @@ describe('start() when MongoDB refuses the connection', () => {
 	 *
 	 * ⚠️ The sibling services delete `PLATFORM_NAME` here; this one has no such variable, because it
 	 * sends no mail. `REDIS_DB3_PORT` is the pick instead: `vitest.config.mts` pins NODE_ENV,
-	 * REDIS_KEY, INTROSPECTION_CODE, PORT and MONGODB_URI for the integration project, and deleting
+	 * REDIS_KEY, PORT and MONGODB_URI for the integration project, and deleting
 	 * one of those would fight the test harness itself. It is restored in the `finally` before
 	 * anything reconnects — the guard throws on the first missing name it meets, and PORT (listed
 	 * before it) is pinned, so nothing here ever reaches a Redis connect with the key absent.

@@ -35,9 +35,6 @@ export const ENDPOINT = '/user-authenticated-resource'
  * by nothing on this platform at all, not merely by nothing here, and they are gone from the two
  * lists that still carried them and from all nine `env` templates.
  *
- * `INTROSPECTION_CODE` stays: `authorizationAuthenticatedResourceHandler` compares against it, and an
- * unset one would make the comparison `'undefined' === 'undefined'` for any caller sending that
- * literal string.
  *
  * `DSN` is absent too, for a different reason than the rest: Sentry is *optional*.
  * `Sentry.init({ dsn: undefined })` is a no-op, and requiring the variable made boot fail *silently* —
@@ -61,8 +58,7 @@ export const REQUIRED_ENV_VARS = [
 	// than being left to fail later: a service that boots without them cannot read a single personal
 	// field, and every query that touches one throws on its first use instead of at startup.
 	'CSFLE_MASTER_KEY_PATH',
-	'CSFLE_KEY_VAULT_NAMESPACE',
-	'INTROSPECTION_CODE'
+	'CSFLE_KEY_VAULT_NAMESPACE'
 ]
 
 /**

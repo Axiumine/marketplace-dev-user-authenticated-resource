@@ -56,12 +56,9 @@ describe('production hardening actually applies to a real server', () => {
 	 *
 	 * This service gates every request behind authorizationAuthenticatedResourceHandler BEFORE it
 	 * reaches Apollo, so a bare request is refused at 412 and never touches the validation rules at
-	 * all. This test used to get past that gate with the `x-introspectioncode` header. Today
-	 * that header does nothing outside `development` and `test`, and the whole point of booting this
-	 * server is that it is neither. So the request carries a real session instead — one access hash in
-	 * the live Redis, exactly as a logged-in caller would — which also makes the assertion stronger:
-	 * the introspection query is refused for an authenticated caller, not merely for an unauthenticated
-	 * one.
+	 * all. The request therefore carries a real session — one access hash in the live Redis, exactly as
+	 * a logged-in caller would — which also makes the assertion stronger: the introspection query is
+	 * refused for an authenticated caller, not merely for an unauthenticated one.
 	 */
 	it('refuses introspection when booted as production', async () => {
 		const realNodeEnv = process.env.NODE_ENV

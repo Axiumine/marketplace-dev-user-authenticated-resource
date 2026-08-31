@@ -48,8 +48,7 @@ export default defineConfig({
 					// process.env keys, so these win over whatever the local `.env` holds.
 					env: {
 						NODE_ENV: 'test',
-						REDIS_KEY: 'test:',
-						INTROSPECTION_CODE: 'test-introspection-code'
+						REDIS_KEY: 'test:'
 					}
 				}
 			},
@@ -77,7 +76,6 @@ export default defineConfig({
 					env: {
 						NODE_ENV: 'test',
 						REDIS_KEY: 'marketplaceDev:itest:userAuthenticatedResource:',
-						INTROSPECTION_CODE: 'test-introspection-code',
 						PORT: '0',
 						MONGODB_URI: buildTestMongoUrl('rw'),
 						// ADR-029. start() refuses to boot without these two, and the file the first one
