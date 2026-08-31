@@ -1,4 +1,5 @@
 import type { ApolloServer } from '@apollo/server'
+import type { EnvShape } from '@axiumine/marketplace-common/others/assertEnvShape'
 import http from 'http'
 import { Types } from 'mongoose'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,6 +27,7 @@ vi.mock('@axiumine/marketplace-common/models/MongoDB/User', () => ({ User: { fin
 const {
 	ENDPOINT,
 	REQUIRED_ENV_VARS,
+	ENV_SHAPES,
 	checkRequiredEnv,
 	buildValidationRules,
 	healthResponse,
@@ -45,6 +47,71 @@ describe('ENDPOINT', () => {
 		expect(ENDPOINT).toBe('/user-authenticated-resource')
 	})
 })
+
+/*
+ * ⚠️ The shape table the cases below are driven from is written out here rather than read off
+ * `ENV_SHAPES`, and the two are reconciled by one assertion. `it.each` is evaluated when vitest
+ * COLLECTS the file, and in the services that import `src/index.mts` dynamically inside a `beforeAll`
+ * — which is how a module-load-time mutant is made attributable to a test — the export does not exist
+ * yet at that moment. A table read from the module would generate zero cases there, and zero cases is
+ * a green run. Written here it generates the same cases in all nine.
+ */
+const EXPECTED_SHAPES: Readonly<Record<string, EnvShape>> = {
+	PORT: 'port',
+	REDIS_IS_CLUSTER: 'flag01',
+	REDIS_URL: 'redisUrl',
+	REDIS_DB1_HOST: 'hostname',
+	REDIS_DB2_HOST: 'hostname',
+	REDIS_DB3_HOST: 'hostname',
+	REDIS_DB1_PORT: 'port',
+	REDIS_DB2_PORT: 'port',
+	REDIS_DB3_PORT: 'port',
+	REDIS_KEY: 'keyPrefix',
+	MONGODB_URI: 'mongoUri',
+	CSFLE_MASTER_KEY_PATH: 'absolutePath',
+	CSFLE_KEY_VAULT_NAMESPACE: 'namespace'
+}
+
+/**
+ * A value of the right *kind* for every name the map above constrains, and `'x'` for every name it does
+ * not. `checkRequiredEnv` runs a shape pass after the presence loop, so an environment of `'x'`
+ * everywhere no longer reaches the branch a test is about — it fails on `PORT` before getting there.
+ *
+ * `flag01` samples `'0'`, which keeps the default environment on the single-node Redis branch the old
+ * `'x'` landed on: every test below that turns on `REDIS_URL` still tests what it used to.
+ */
+const SHAPED: Readonly<Record<EnvShape, string>> = {
+	absolutePath: '/srv/marketplace',
+	email: 'noreply@shop.lan',
+	flag01: '0',
+	hostname: 'db1',
+	keyPrefix: 'marketplaceDev:',
+	mongoUri: 'mongodb://127.0.0.1:27017/dbMarketplaceDev',
+	namespace: 'dbMarketplaceDev.__keyVault',
+	origin: 'https://shop.lan',
+	// ⚠️ `0`, not a real port: `validEnv()` reaches `start()` in the tests below and a fixed number would
+	// make them bind it for real — colliding with whichever service of this fleet is running on the
+	// developer's machine. `0` is the ephemeral port the integration projects bind on for the same reason.
+	port: '0',
+	redisUrl: 'redis://127.0.0.1:6379'
+}
+
+/** One value of the wrong kind per shape, each a mistake a real environment makes rather than nonsense. */
+const MISSHAPEN: Readonly<Record<EnvShape, string>> = {
+	absolutePath: 'srv/marketplace',
+	email: 'noreply.shop.lan',
+	flag01: 'true',
+	hostname: 'redis://db1',
+	keyPrefix: 'marketplaceDev',
+	mongoUri: 'redis://127.0.0.1:6379',
+	namespace: 'dbMarketplaceDev',
+	origin: 'https://shop.lan/',
+	port: '4027x',
+	redisUrl: 'mongodb://127.0.0.1:27017/dbMarketplaceDev'
+}
+
+const shaped = (name: string): string => SHAPED[EXPECTED_SHAPES[name]] ?? 'x'
+const validEnv = (): Record<string, string> => Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, shaped(k)]))
 
 describe('checkRequiredEnv', () => {
 	/*
@@ -76,9 +143,9 @@ describe('checkRequiredEnv', () => {
 	})
 
 	// ⚠️ `REDIS_URL` is set here and is deliberately NOT in the list: it is required only when
-	// `REDIS_IS_CLUSTER` is not `'1'`, which is the branch a stub environment of `'x'` everywhere lands on.
+	// `REDIS_IS_CLUSTER` is not `'1'`, which is the branch `validEnv()`'s `'0'` lands on.
 	it('passes when every required variable is set', () => {
-		const env = { ...Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, 'x'])), REDIS_URL: 'redis://127.0.0.1:6379' }
+		const env = { ...validEnv(), REDIS_URL: 'redis://127.0.0.1:6379' }
 		expect(() => checkRequiredEnv(env)).not.toThrow()
 	})
 
@@ -91,7 +158,7 @@ describe('checkRequiredEnv', () => {
 	// The *last* entry, so a mutant that stops the loop short is caught and not just one that skips
 	// index 0.
 	it('names a variable missing further down the list', () => {
-		const env = Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, 'x']))
+		const env = validEnv()
 		delete env.CSFLE_KEY_VAULT_NAMESPACE
 
 		expect(() => checkRequiredEnv(env)).toThrow('Missing required environment variable: CSFLE_KEY_VAULT_NAMESPACE')
@@ -139,14 +206,14 @@ describe('checkRequiredEnv', () => {
 	 * `RISK_REGISTER` R04 describes.
 	 */
 	it('requires REDIS_URL when REDIS_IS_CLUSTER is not "1"', () => {
-		const env = Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, 'x']))
+		const env = validEnv()
 		env.REDIS_IS_CLUSTER = '0'
 
 		expect(() => checkRequiredEnv(env)).toThrow('Missing required environment variable: REDIS_URL')
 	})
 
 	it('accepts the single-node branch once REDIS_URL names a server', () => {
-		const env = Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, 'x']))
+		const env = validEnv()
 		env.REDIS_IS_CLUSTER = '0'
 		env.REDIS_URL = 'redis://127.0.0.1:6379'
 
@@ -157,10 +224,55 @@ describe('checkRequiredEnv', () => {
 	// here would refuse the boot of every machine this workspace ships configured. `'1'` exactly, as a
 	// string: that is the comparison koa-utils makes, and `1` or `'true'` takes the single-node branch.
 	it('does not require REDIS_URL on the cluster branch', () => {
-		const env = Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, 'x']))
+		const env = validEnv()
 		env.REDIS_IS_CLUSTER = '1'
 
 		expect(() => checkRequiredEnv(env)).not.toThrow()
+	})
+
+	/*
+	 * ⚠️ The whole map, by value, for the same reason the array above is asserted whole: both ways of
+	 * breaking it are silent. A name dropped from `ENV_SHAPES` stops being checked and the boot goes back
+	 * to accepting any non-empty string in that slot; a shape changed to the wrong one refuses a correct
+	 * value on the next machine provisioned. Neither shows up in a run of this suite otherwise — and it is
+	 * also what ties `EXPECTED_SHAPES` to the module, so the table cannot quietly drift into testing a map
+	 * the service does not use.
+	 */
+	it('shape-checks exactly these names', () => {
+		expect(ENV_SHAPES).toStrictEqual(EXPECTED_SHAPES)
+	})
+
+	/*
+	 * One wrong-kind value per name, on an environment that is otherwise complete and well formed — so
+	 * the only thing that can fail is the shape pass, and the message must name that one variable.
+	 * `REDIS_URL` is spread in because a misshapen `REDIS_IS_CLUSTER` is not `'1'` and puts the check on
+	 * the single-node branch, where an absent url is a *presence* fault that would mask the shape one.
+	 */
+	it.each(Object.entries(EXPECTED_SHAPES))('refuses a %s that is not a valid %s', (name, shape) => {
+		const env = { ...validEnv(), REDIS_URL: SHAPED.redisUrl, [name]: MISSHAPEN[shape] }
+
+		expect(() => checkRequiredEnv(env)).toThrow(`ENV_SHAPE_INVALID: ${name} must be `)
+	})
+
+	// Every fault at once: provisioning a machine is when this fires, and one name per restart is a queue.
+	it('names every misshapen variable in one message', () => {
+		const env = { ...validEnv(), REDIS_URL: SHAPED.redisUrl, PORT: MISSHAPEN.port, REDIS_KEY: MISSHAPEN.keyPrefix }
+
+		expect(() => checkRequiredEnv(env)).toThrow(
+			'ENV_SHAPE_INVALID: PORT must be a TCP port between 0 and 65535; REDIS_KEY must be a key prefix ending in ":".'
+		)
+	})
+
+	/*
+	 * ⚠️ Presence first, shape second, and the order is the assertion. One name is unset here *and*
+	 * `PORT` is misshapen; the boot must name the missing one, because an admin told to fix a format in
+	 * a variable they have not written yet goes looking for a line that is not in the file.
+	 */
+	it('reports a missing variable before a misshapen one', () => {
+		const env = { ...validEnv(), REDIS_URL: SHAPED.redisUrl, PORT: MISSHAPEN.port }
+		delete env.MONGODB_URI
+
+		expect(() => checkRequiredEnv(env)).toThrow('Missing required environment variable: MONGODB_URI')
 	})
 })
 
@@ -304,8 +416,8 @@ function resetStartMocks() {
 	// keygrip probe start() now runs first. Only `wrapped` is read — presence, never the value.
 	hGetAll.mockReset().mockResolvedValue({ wrapped: 'seeded' })
 	// ⚠️ `REDIS_URL` is stubbed on top of the list because it is not in it: the guard requires it only
-	// when `REDIS_IS_CLUSTER` is not `'1'`, and an environment stubbed `'x'` everywhere is that branch.
-	for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, 'x')
+	// when `REDIS_IS_CLUSTER` is not `'1'`, and `validEnv()`'s `'0'` is that branch.
+	for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, shaped(k))
 	vi.stubEnv('REDIS_URL', 'redis://127.0.0.1:6379')
 }
 
@@ -360,7 +472,7 @@ describe('start (failure path)', () => {
 
 		await start()
 
-		expect(hGetAll).toHaveBeenCalledExactlyOnceWith('xkeygrip')
+		expect(hGetAll).toHaveBeenCalledExactlyOnceWith(`${SHAPED.keyPrefix}keygrip`)
 		expect(captureException).toHaveBeenCalledWith(
 			expect.objectContaining({ message: expect.stringContaining('KEYGRIP_RECORD_MISSING') })
 		)
@@ -396,7 +508,7 @@ describe('start (failure path)', () => {
 		expect(server).toBeDefined()
 		// The keygrip record read once, at `<REDIS_KEY>keygrip` — the exact key, because the whole point
 		// of the probe is which namespace it looked in. `REDIS_KEY` is the 'x' stub here.
-		expect(hGetAll).toHaveBeenCalledExactlyOnceWith('xkeygrip')
+		expect(hGetAll).toHaveBeenCalledExactlyOnceWith(`${SHAPED.keyPrefix}keygrip`)
 		expect(disconnectAllDatabases).not.toHaveBeenCalled()
 
 		await server!.apolloServer.stop()
@@ -581,7 +693,7 @@ describe('request dispatch', () => {
 // A comment cannot prevent that; this test can, and it is the reason the setting is never assigned.
 describe('app.proxy', () => {
 	it('is off on the constructed Koa app', async () => {
-		for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, 'x')
+		for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, shaped(k))
 		vi.stubEnv('REDIS_URL', 'redis://127.0.0.1:6379')
 
 		const { app, apolloServer } = await createServer()
@@ -606,7 +718,7 @@ describe('start (missing environment)', () => {
 	})
 
 	it('rejects — with no datasource touched — when a required variable is missing', async () => {
-		for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, 'x')
+		for (const k of REQUIRED_ENV_VARS) vi.stubEnv(k, shaped(k))
 		vi.stubEnv('REDIS_URL', 'redis://127.0.0.1:6379')
 		vi.stubEnv('REDIS_KEY', '')
 		RedisConnect.mockClear()
