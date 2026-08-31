@@ -2,9 +2,10 @@ import { ApolloServer } from '@apollo/server'
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer'
 import { koaMiddleware as apolloServerKoa } from '@as-integrations/koa'
 import { MongoDBConnect } from '@axiumine/koa-utils/dataSources/MongoDB'
-import { RedisConnect } from '@axiumine/koa-utils/dataSources/Redis'
+import { redisClient, RedisConnect } from '@axiumine/koa-utils/dataSources/Redis'
 import { tdwKoaErrorHandler } from '@axiumine/koa-utils/koa/tdwKoaErrorHandler'
 import { setupFieldEncryption } from '@axiumine/marketplace-common/encryption/setupFieldEncryption'
+import { assertRedisNamespace } from '@axiumine/marketplace-common/others/assertRedisNamespace'
 import { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mjs'
 import { authorizationAuthenticatedResourceHandler } from '@lib/db/authorizationAuthenticatedResourceHandler.mjs'
 import { disconnectAllDatabases } from '@lib/db/disconnectAllDatabases.mjs'
@@ -72,6 +73,20 @@ export function checkRequiredEnv(env: NodeJS.ProcessEnv = process.env): void {
 			throw new Error(mex)
 		}
 	}
+
+	/*
+	 * ⚠️ **`REDIS_URL` is required on the single-node branch and on that branch only**, which is why it is checked
+	 * here instead of being listed above. `REDIS_IS_CLUSTER=1` builds the cluster client out of the three
+	 * `REDIS_DB*` pairs and never reads it — the committed `env` template ships it empty for exactly that reason,
+	 * so a flat entry in the list would refuse the boot of a machine that is configured correctly.
+	 *
+	 * Any other value takes the `createClient({ url: resolveRedisUrl(REDIS_URL) })` branch, where node-redis
+	 * answers an unset url with its own default of `redis://localhost:6379`. Empty is not an error there: the
+	 * service connects to whatever happens to listen on this machine, writes every session into it and reports
+	 * itself healthy, which is a wrong-but-populated environment nothing downstream can tell from a right one
+	 * (`RISK_REGISTER` R04). `SETUP.md` puts a fresh machine on precisely that branch.
+	 */
+	if (env.REDIS_IS_CLUSTER !== '1' && !env.REDIS_URL) throw new Error('Missing required environment variable: REDIS_URL')
 }
 
 /**
@@ -206,6 +221,22 @@ export async function start() {
 		 * DB
 		 */
 		await Promise.all([MongoDBConnect(), RedisConnect()])
+
+		/****************
+		 * Redis namespace (ADR-034)
+		 *
+		 * The first thing asked of the connection, because `REDIS_KEY` is a prefix and there is no wrong value
+		 * Redis itself refuses. Every request this service answers is authorised by reading the session hash the
+		 * authorization tier wrote, so a prefix naming a namespace nobody seeded used to cost it nothing at boot:
+		 * every lookup missed, every caller was answered 401, and the service reported itself healthy while doing
+		 * it. The five services that call `loadKeygrip` already fail here; this is the same refusal for a tier
+		 * that reads no key material.
+		 *
+		 * Presence only — unwrapping the record is `readKeygrip`'s business, on behalf of the services that sign.
+		 * It cannot see a fleet-wide wrong prefix, which is `RISK_REGISTER` R04 and is not a question a service
+		 * can ask about itself.
+		 */
+		await assertRedisNamespace(redisClient)
 
 		/****************
 		 * Field encryption (ADR-029)
