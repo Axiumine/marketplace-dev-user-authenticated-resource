@@ -38,9 +38,8 @@ old project's — so `vitest.mongo.mts` refused to build a URL and `missingTestM
 them. They are filled in now and the two database users were provisioned with the loop in
 `marketplace-db-setup/setup/mongodb.js`.
 
-Two other keys in the same file were wrong rather than missing: `MONGODB_URI` pointed at `testRnApollo`, a
-leftover database from that other project with no `authSource`, and `INTROSPECTION_CODE` differed from the
-seven other services', which breaks the service-to-service bypass in both directions.
+One other key in the same file was wrong rather than missing: `MONGODB_URI` pointed at `testRnApollo`, a
+leftover database from that other project with no `authSource`.
 
 The platform convention still holds — `MONGO_TEST_DB`, `MONGO_TEST_AUTH_ADMIN` and the database path of
 `MONGO_TEST_CONN_STRING` all carry the same name, unique to the repo (`dbMarketplaceTestUserRes` here),
@@ -50,7 +49,7 @@ since every `globalSetup` drops its own database.
 
 |File|Covers|
 |---|---|
-|`index.itest.mts`|the bearer gate against a live Redis session (412 / 499 / 498 / **403** for another tier and for a session with no `tier` at all), the `x-introspectioncode` bypass, CSRF on GET, a full `me` selection, a secret-non-leak check that no hash reaches the wire, and the same pair for `userExport` — the decrypted round-trip including the two login timestamps, and a body scan that additionally refuses `emailVerify.newEmailTmp`, the one encrypted value a widened projection would hand back in plaintext|
+|`index.itest.mts`|the bearer gate against a live Redis session (412 / 499 / 498 / **403** for another tier and for a session with no `tier` at all), CSRF on GET, a full `me` selection, a secret-non-leak check that no hash reaches the wire, and the same pair for `userExport` — the decrypted round-trip including the two login timestamps, and a body scan that additionally refuses `emailVerify.newEmailTmp`, the one encrypted value a widened projection would hand back in plaintext|
 |`account.itest.mts`|`userPersonalDataUpdate` and `userUpdatePwd` against the real validator — including a raw-driver counter-proof that `contacts: { mobile: null }` is refused with `code: 121` while a real number is accepted, and real bcrypt on both sides of the password change; plus `userDel` — the `deleted` stamp accepted by the `$expr` clause on a document that carries a `defaultAddress`, the caller's key really gone from the cluster, 498 from the token layer on the second call, the resolver's own 410 when a session outlives the close, and a suspended customer closing anyway|
 |`addresses.itest.mts`|the three address mutations plus `userDefaultAddressSet`, including the six-address cap — six accepted through the real mutation, the seventh answered 400 — and a block that drives the collection validator directly: `$pull` of the default rejected, `$pull` of a non-default accepted, a foreign pointer rejected, a pointer with no `addresses` rejected, a seventh address rejected on insert and on `$push`|
 |`shutdown.itest.mts`|`gracefulShutdown`, the process-level handlers, production introspection refusal, and the 5s teardown budget lost for real against a local blackhole socket|

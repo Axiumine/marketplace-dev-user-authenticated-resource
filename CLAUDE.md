@@ -138,9 +138,6 @@ and two concurrent adds cannot both fit through.
 terminates a bare value at the first space, hands back the truncated prefix and reports no error. Not
 double quotes: dotenv expands `\n` and `\r` escapes inside those.
 
-`INTROSPECTION_CODE` must equal the other eight services' — a mismatch breaks the service-to-service
-bypass in both directions and nothing tests the pairing.
-
 ## Tests
 
 100% on all four coverage metrics, mutation score 100. Unit files plus `*.itest.mts` integration files.

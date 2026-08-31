@@ -98,7 +98,7 @@ sources' own `dotenv.config()`). It overrides only the keyspace prefix
 (`REDIS_KEY=marketplaceDev:itest:userAuthenticatedResource:`, this service's own isolated,
 ACL-allowed namespace — the `marketplaceDev:itest:` stem is shared because the ACL grants that
 pattern, but the third segment is unique per service so every service can run its integration suite
-at once), `PORT=0` (ephemeral) and `INTROSPECTION_CODE`. Run just one side with `yarn test:unit` /
+at once) and `PORT=0` (ephemeral). Run just one side with `yarn test:unit` /
 `yarn test:integration`.
 
 Consequence: the coverage gate — and therefore `pre-push` — needs Redis and MongoDB reachable. That

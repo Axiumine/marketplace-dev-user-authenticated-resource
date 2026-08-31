@@ -1,5 +1,5 @@
 import type { Next } from 'koa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
@@ -118,7 +118,6 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 	})
 
 	// AB-04: a request carrying no credential is refused
-	// AB-10: no x-introspectioncode at all leaves the ordinary refusal exactly as it is
 	it('answers 412 when there is no authorization header', async () => {
 		const ctx = makeCtx({})
 
@@ -159,94 +158,5 @@ describe('authorizationAuthenticatedResourceHandler', () => {
 		const ctx = makeCtx({ authorization: `Bearer ${ACCESS}` })
 
 		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Invalid Token')
-	})
-
-	// Service-to-service calls: the code stands in for the whole bearer flow, so no Redis lookup
-	// happens and state.user is never populated. Resolvers that need ctx.state.user must not be
-	// called this way — introspection is what this is for.
-	// AB-08: a valid x-introspectioncode is accepted with no credential at all, and reads no session
-	it('lets a valid x-introspectioncode through with no authorization header', async () => {
-		const ctx = makeCtx({ 'x-introspectioncode': 'test-introspection-code' })
-
-		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).resolves.toBe('next')
-
-		expect(hGetAll).not.toHaveBeenCalled()
-		expect(ctx.state.user).toBeUndefined()
-		expect(next).toHaveBeenCalledTimes(1)
-	})
-
-	// AB-09: a wrong x-introspectioncode is refused
-	it('ignores a wrong x-introspectioncode', async () => {
-		const ctx = makeCtx({ 'x-introspectioncode': 'wrong-code' })
-
-		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Precondition Failed')
-	})
-
-	// The code is only consulted when the header is missing: a caller that sends both is
-	// authenticated normally, and a bad token is still refused.
-	it('does not let the introspection code rescue a bearer token whose session expired', async () => {
-		hGetAll.mockResolvedValueOnce({})
-
-		const ctx = makeCtx({ authorization: `Bearer ${ACCESS}`, 'x-introspectioncode': 'test-introspection-code' })
-
-		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Invalid Token')
-	})
-
-	// Nor the reverse: the introspection bypass must not become a way around the tier assertion.
-	it('does not let the introspection code rescue a bearer token from another tier', async () => {
-		hGetAll.mockResolvedValueOnce(redisSession({ tier: 'admin' }))
-
-		const ctx = makeCtx({ authorization: `Bearer ${ACCESS}`, 'x-introspectioncode': 'test-introspection-code' })
-
-		await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Forbidden')
-	})
-	/*
-	 * The bypass is a development convenience and outside `development` and `test` it does not
-	 * exist: the gate is read before the code is, so the configured value is never consulted and the
-	 * header is worth exactly what a header nobody sent is worth.
-	 */
-	describe('outside the environment allowlist', () => {
-		afterEach(() => {
-			vi.unstubAllEnvs()
-		})
-
-		/** The rejection flattened to what an HTTP client actually sees. */
-		const refusal = async (header?: Record<string, string>) => {
-			try {
-				await authorizationAuthenticatedResourceHandler()(makeCtx(header), next)
-			} catch (error) {
-				const { message, extensions } = error as { message: string; extensions: unknown }
-				return { message, extensions }
-			}
-			throw new Error('expected the handler to reject, and it returned')
-		}
-
-		// Every value below is admitted by the `NODE_ENV !== 'production'` form this gate replaced, and
-		// each is a shape a real deploy produces: a container runtime that exports nothing, a shell that
-		// exports an empty string, a capital letter, a staging box nobody ever classified.
-		// AB-11: a valid x-introspectioncode is refused outside the environment allowlist, indistinguishably from none
-		it.each([['production'], ['staging'], ['Production'], [''], [undefined]])(
-			'refuses a valid x-introspectioncode under NODE_ENV=%o',
-			async (environment) => {
-				vi.stubEnv('NODE_ENV', environment)
-
-				const ctx = makeCtx({ 'x-introspectioncode': 'test-introspection-code' })
-
-				await expect(authorizationAuthenticatedResourceHandler()(ctx, next)).rejects.toThrow('Precondition Failed')
-
-				expect(hGetAll).not.toHaveBeenCalled()
-				expect(ctx.state.user).toBeUndefined()
-				expect(next).not.toHaveBeenCalled()
-			}
-		)
-
-		// ⚠️ The refusal is the handler's own, down to the status and the description. A gate that threw
-		// something of its own would tell the caller that the code was right and only the environment
-		// wrong — which is the one thing the response must not distinguish.
-		it('refuses it with the error a request carrying no header at all gets', async () => {
-			vi.stubEnv('NODE_ENV', 'production')
-
-			expect(await refusal({ 'x-introspectioncode': 'test-introspection-code' })).toEqual(await refusal())
-		})
 	})
 })

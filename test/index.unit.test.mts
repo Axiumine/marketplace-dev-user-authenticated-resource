@@ -71,8 +71,7 @@ describe('checkRequiredEnv', () => {
 			'REDIS_KEY',
 			'MONGODB_URI',
 			'CSFLE_MASTER_KEY_PATH',
-			'CSFLE_KEY_VAULT_NAMESPACE',
-			'INTROSPECTION_CODE'
+			'CSFLE_KEY_VAULT_NAMESPACE'
 		])
 	})
 
@@ -91,16 +90,16 @@ describe('checkRequiredEnv', () => {
 	// index 0.
 	it('names a variable missing further down the list', () => {
 		const env = Object.fromEntries(REQUIRED_ENV_VARS.map((k) => [k, 'x']))
-		delete env.INTROSPECTION_CODE
+		delete env.CSFLE_KEY_VAULT_NAMESPACE
 
-		expect(() => checkRequiredEnv(env)).toThrow('Missing required environment variable: INTROSPECTION_CODE')
+		expect(() => checkRequiredEnv(env)).toThrow('Missing required environment variable: CSFLE_KEY_VAULT_NAMESPACE')
 	})
 
 	// ⚠️ The list is shorter than the ShopOwner service's, and every omission is a dependency this
 	// tier does not have — `checkRequiredEnv` throws on a *missing* variable, so a leftover entry
 	// turns a perfectly bootable service into a startup crash. Pinned as an exact set: this is the
 	// only place the shortening is written down as something a test can defend.
-	it('demands the fifteen variables this tier actually reads, and no more', () => {
+	it('demands the fourteen variables this tier actually reads, and no more', () => {
 		expect(REQUIRED_ENV_VARS).toEqual([
 			'PORT',
 			'REDIS_IS_CLUSTER',
@@ -115,8 +114,7 @@ describe('checkRequiredEnv', () => {
 			'REDIS_KEY',
 			'MONGODB_URI',
 			'CSFLE_MASTER_KEY_PATH',
-			'CSFLE_KEY_VAULT_NAMESPACE',
-			'INTROSPECTION_CODE'
+			'CSFLE_KEY_VAULT_NAMESPACE'
 		])
 	})
 
@@ -385,7 +383,7 @@ describe('start (success path)', () => {
  * `authorizationAuthenticatedResourceHandler` is mounted app-wide and *before* the dispatch. That is
  * not an oversight to route around: an unauthenticated health check would be the one path on this
  * service an anonymous caller could reach, and it answers from the same process the customer data
- * lives in. A monitor calls it with the introspection code, which is exactly what that header is for.
+ * lives in. A monitor carries a session like every other caller, or reads liveness from the edge.
  */
 describe('request dispatch', () => {
 	let httpServer: http.Server
@@ -394,7 +392,10 @@ describe('request dispatch', () => {
 
 	const userId = new Types.ObjectId('507f1f77bcf86cd799439011')
 	const ACCESS = 'access:27119032-9043-4a9f-bd4c-9d06fd576290'
-	const INTROSPECTION = { 'x-introspectioncode': 'test-introspection-code' }
+	const AUTHENTICATED = { authorization: `Bearer ${ACCESS}` }
+	/** The session the two credential-only arms below need read back out of Redis. */
+	const customerSession = () =>
+		Object.assign(Object.create(null), { _id: String(userId), email: 'cliente@marketplace.test', tier: 'user' })
 
 	beforeAll(async () => {
 		const server = await createServer()
@@ -416,7 +417,9 @@ describe('request dispatch', () => {
 	})
 
 	it('answers the health check on /health', async () => {
-		const res = await fetch(`${origin}/health`, { headers: INTROSPECTION })
+		hGetAll.mockResolvedValueOnce(customerSession())
+
+		const res = await fetch(`${origin}/health`, { headers: AUTHENTICATED })
 
 		expect(res.status).toBe(200)
 		await expect(res.json()).resolves.toMatchObject({ status: 'OK' })
@@ -426,7 +429,9 @@ describe('request dispatch', () => {
 	// 404. Nothing else is mounted, so this is the whole surface — there are no REST routes on this
 	// tier, and the three that exist on the platform all live on the public service.
 	it('answers 404 on any other path', async () => {
-		const res = await fetch(`${origin}/anything-else`, { headers: INTROSPECTION })
+		hGetAll.mockResolvedValueOnce(customerSession())
+
+		const res = await fetch(`${origin}/anything-else`, { headers: AUTHENTICATED })
 
 		expect(res.status).toBe(404)
 	})

@@ -183,10 +183,10 @@ describe('endEverySession', () => {
 	})
 
 	/*
-	 * The introspection bypass reaches a resolver with no `Authorization` header at all, so there is no
-	 * caller session to end — the account's own sessions still go. Deriving a key from a missing header
-	 * would delete the digest of the empty string: a key belonging to nobody, and a delete reported as a
-	 * success.
+	 * A resolver only runs once the authorization handler has seen an `Authorization` header, so this is
+	 * the defensive branch rather than a reachable one — and it earns its place: deriving a key from a
+	 * missing header would delete the digest of the empty string, a key belonging to nobody, and report
+	 * the delete as a success.
 	 */
 	it('deletes no access key when the request carried no Authorization header', async () => {
 		await endEverySession(ctx({}))

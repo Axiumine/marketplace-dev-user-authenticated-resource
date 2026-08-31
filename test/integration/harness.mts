@@ -32,7 +32,6 @@ import { ENDPOINT, start } from '../../src/index.mts'
  ****************************************************************************************/
 
 export const REDIS_KEY = process.env.REDIS_KEY as string
-export const INTROSPECTION_CODE = process.env.INTROSPECTION_CODE as string
 
 /**
  * A syntactically valid bcrypt hash for seeds where nothing ever compares a password — the
