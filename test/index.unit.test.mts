@@ -614,6 +614,31 @@ describe('request dispatch', () => {
 		expect(res.status).toBe(404)
 	})
 
+	// ⚠️ The else arm's `await next()` is the one line the test above cannot tell apart from a mutant
+	// that empties that branch: nothing is mounted after it in production, so a 404 comes back either
+	// way and the shared server proves nothing. This test builds its own server and mounts a marker
+	// middleware AFTER the dispatch one — Koa's compose walks `app.middleware` by index at request
+	// time, so a middleware pushed after createServer() still runs on the next request through the
+	// same app. The marker only fires if `next()` actually hands control onward.
+	it('hands control to whatever is mounted after it, on the else arm', async () => {
+		const server = await createServer()
+		server.app.use(async (ctx) => {
+			ctx.status = 210
+			ctx.body = 'reached-next'
+		})
+		await new Promise<void>((resolve) => server.httpServer.listen({ port: 0 }, () => resolve()))
+		const localOrigin = `http://127.0.0.1:${(server.httpServer.address() as { port: number }).port}`
+
+		hGetAll.mockResolvedValueOnce(customerSession())
+		const res = await fetch(`${localOrigin}/anything-else`, { headers: AUTHENTICATED })
+
+		expect(res.status).toBe(210)
+		await expect(res.text()).resolves.toBe('reached-next')
+
+		await server.apolloServer.stop()
+		await new Promise<void>((resolve) => server.httpServer.close(() => resolve()))
+	})
+
 	// Auth runs before dispatch, so even the health check needs a credential. 412 rather than 401:
 	// the request carried no Authorization header at all.
 	it('refuses the health check with no credential at all', async () => {

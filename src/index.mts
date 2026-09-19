@@ -203,14 +203,18 @@ export async function createServer() {
 	// The upload middleware is not free to mount — it takes over every multipart request before the
 	// body parser sees it — and the antivirus is a socket to clamd that would have to be running for
 	// this service to boot. They come back the day this tier accepts a file, and not before.
-	app.use(
-		bodyParserKoa({
-			enableTypes: ['json', 'form', 'text'],
-			extendTypes: {
-				json: ['application/json']
-			}
-		})
-	) // needed by Apollo too
+	// needed by Apollo too (koaMiddleware() 500s if ctx.request.body is never set).
+	//
+	// No options: koa-bodyparser's own defaults are `enableTypes: ['json', 'form']` and
+	// `application/json` is already in its default json content-type list, so the explicit config
+	// this used to carry — adding 'text' and re-declaring 'application/json' — changed nothing.
+	// 'text' in particular can never matter here: co-body's text parser always returns a raw string,
+	// and @apollo/server's runHttpQuery rejects any POST body that isn't a plain object
+	// (isNonEmptyStringRecord), so a text/plain body fails identically whether or not 'text' parsing
+	// is enabled (verified by reading node_modules/@apollo/server/dist/esm/runHttpQuery.js and
+	// node_modules/co-body/lib/text.js directly, and by observing the same "POST body missing,
+	// invalid Content-Type, or JSON object has no keys." response either way).
+	app.use(bodyParserKoa())
 
 	/****************
 	 * KOA ENDPOINT
