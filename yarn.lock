@@ -3043,6 +3043,13 @@ graphql-scalars@^1.25.0:
   dependencies:
     tslib "^2.5.0"
 
+graphql-scalars@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/graphql-scalars/-/graphql-scalars-2.0.0.tgz#96de418e8861368a954a2391110d28a0fe032eda"
+  integrity sha512-tCd2ddcxlbz5rG7xsfDbjvIssR9c/5EauDYt272pxfxpUNBjFMpnDwukuA3rm1O/9michQDxFfPPAeoQjZtJVQ==
+  dependencies:
+    tslib "^2.5.0"
+
 graphql@^14.5.3:
   version "14.7.0"
   resolved "https://registry.npmjs.org/graphql/-/graphql-14.7.0.tgz#7fa79a80a69be4a31c27dda824dc04dac2035a72"

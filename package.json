@@ -44,7 +44,7 @@
     "dotenv": "^17.4.2",
     "graphql": "^16.14.2",
     "graphql-depth-limit": "^1.1.0",
-    "graphql-scalars": "^1.25.0",
+    "graphql-scalars": "^2.0.0",
     "koa": "^3.2.1",
     "koa-bodyparser": "^4.4.1",
     "mongodb": "^7.5.0",
