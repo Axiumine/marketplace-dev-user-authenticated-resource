@@ -19,6 +19,8 @@ Token lifecycle → `marketplace-dev-user-authenticated-authorization` (4031). L
 `yarn test:mutation` is **hook-only** — only `pre-push` calls it, never to check one file, never to
 confirm a survivor fixed, and never `stryker` directly. To reproduce a survivor, apply the mutant by hand
 in the source and run `yarn test` (seconds). Why, and the exact bypass rules: [`REPO.md`](./REPO.md).
+⚠️ Since ADR-055 the script has a second caller, `.github/workflows/gates.yml`, which runs it on
+every pull request — two callers, both automated, and a hand is neither.
 
 ## Traps
 
