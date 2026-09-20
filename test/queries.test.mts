@@ -1,8 +1,7 @@
+import type { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mts'
 import { GraphQLError } from 'graphql'
 import { Types } from 'mongoose'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
 const findById = vi.fn()
 

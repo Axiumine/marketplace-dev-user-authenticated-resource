@@ -1,7 +1,6 @@
+import type { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mts'
 import { Types } from 'mongoose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
 const hKeys = vi.fn()
 const hGet = vi.fn()

@@ -1,8 +1,7 @@
+import { validateUserAddress } from '@lib/validate/validateUserAddress.mts'
+import { validateUserPersonalData } from '@lib/validate/validateUserPersonalData.mts'
 import { GraphQLError } from 'graphql'
 import { describe, expect, it } from 'vitest'
-
-import { validateUserAddress } from '../src/lib/validate/validateUserAddress.mts'
-import { validateUserPersonalData } from '../src/lib/validate/validateUserPersonalData.mts'
 
 /** Same reason as in fields.test.mts: `message` is the HTTP title, the field name is in the extensions. */
 function rejection(fn: () => unknown) {

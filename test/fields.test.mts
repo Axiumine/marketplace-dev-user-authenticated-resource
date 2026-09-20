@@ -1,6 +1,3 @@
-import { GraphQLError } from 'graphql'
-import { describe, expect, it } from 'vitest'
-
 import {
 	birthDate,
 	coordinate,
@@ -13,7 +10,9 @@ import {
 	SHAPE_POSTAL_CODE,
 	SHAPE_PROVINCE,
 	textWithFormat
-} from '../src/lib/validate/fields.mts'
+} from '@lib/validate/fields.mts'
+import { GraphQLError } from 'graphql'
+import { describe, expect, it } from 'vitest'
 
 /**
  * ⚠️ koa-utils splits an error in two, and the half that matters here is not the one `toThrow`
