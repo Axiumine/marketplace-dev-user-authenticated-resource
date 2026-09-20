@@ -45,7 +45,10 @@ const POSITION_TYPE = 'Point'
  * `position` is coordinates only because `type` has exactly one legal value: asking a client for a
  * constant is only a way to receive `point` and fail the write.
  */
-export type IUserAddressInput = Omit<IUserAddress, '_id' | 'position'> & {
+// `label` is named in the Omit alongside `_id` and `position`: IUserAddress itself declares
+// `label?: string` (no null), and leaving it out of the Omit would intersect that with the `string |
+// null` below into plain `string` — silently dropping the null this type exists to accept.
+export type IUserAddressInput = Omit<IUserAddress, '_id' | 'position' | 'label'> & {
 	label?: string | null
 	position?: { coordinates: number[] } | null
 }

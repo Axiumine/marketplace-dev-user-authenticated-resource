@@ -1,0 +1,14 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": ".",
+		"types": ["node"],
+		// test/ imports its own siblings and the vitest configs with an explicit .mts extension —
+		// there is no compiled .mjs for them to resolve to the way src/ imports do, because this
+		// project never emits them. Only legal with noEmit (set above): TypeScript refuses to guess
+		// what extension a .ts-extension import would become in JS output.
+		"allowImportingTsExtensions": true
+	},
+	"include": ["src/**/*.mts", "test/**/*.mts", "vitest*.mts"]
+}

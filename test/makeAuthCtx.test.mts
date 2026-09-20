@@ -1,7 +1,6 @@
+import { makeAuthCtx } from '@lib/auth/makeAuthCtx.mts'
 import { Types } from 'mongoose'
 import { describe, expect, it } from 'vitest'
-
-import { makeAuthCtx } from '../src/lib/auth/makeAuthCtx.mts'
 
 const OID = '507f1f77bcf86cd799439011'
 
@@ -9,7 +8,9 @@ describe('makeAuthCtx', () => {
 	// Redis stores everything as strings; the rest of the service expects a real ObjectId, so this
 	// is where the conversion has to happen — resolvers must never re-parse it.
 	it('turns the Redis hash into the node-side context, rehydrating _id as an ObjectId', () => {
-		const user = makeAuthCtx({ _id: OID, email: 'cliente@marketplace.test' })
+		// tier is required on IRedisDataUser (it's how the boundary asserts the session before this
+		// function ever runs) but makeAuthCtx drops it — hence no assertion on it below.
+		const user = makeAuthCtx({ _id: OID, email: 'cliente@marketplace.test', tier: 'user' })
 
 		expect(user._id).toBeInstanceOf(Types.ObjectId)
 		expect(user._id.toHexString()).toBe(OID)

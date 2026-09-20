@@ -1,7 +1,6 @@
+import type { IContextUserAuthenticatedResource } from '@lib/auth/IContextUserAuthenticatedResource.mts'
 import type { Next } from 'koa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-import type { IContextUserAuthenticatedResource } from '../src/lib/auth/IContextUserAuthenticatedResource.mts'
 
 const hGetAll = vi.fn()
 vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ redisClient: { hGetAll } }))
