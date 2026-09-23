@@ -1,10 +1,10 @@
 #!/bin/bash
 
-mkdir -p /var/ram/marketplace-authenticated-resource/node_modules
+mkdir -p /var/ram/marketplace-user-authenticated-resource/node_modules
 rm -rf node_modules/*
 sync
 mkdir node_modules
-sudo mount --bind /var/ram/marketplace-authenticated-resource/node_modules node_modules  # <--- add to sudoers
+sudo mount --bind /var/ram/marketplace-user-authenticated-resource/node_modules node_modules  # <--- add to sudoers
 
 #load nvm
 . ~/.nvm/nvm.sh
