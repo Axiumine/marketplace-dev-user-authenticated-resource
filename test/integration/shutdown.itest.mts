@@ -117,16 +117,19 @@ describe('process-level error handlers', () => {
 		exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
 	})
 
-	it('exits 1 on an unhandled rejection', () => {
+	// Neither handler awaits any more: process.exit() is reached from a real Sentry.flush(2000)'s own
+	// callback (no DSN in this environment, so it settles almost at once), so the exit lands a tick or
+	// two after the call returns rather than inside it.
+	it('exits 1 on an unhandled rejection', async () => {
 		onUnhandledRejection(new Error('itest unhandled rejection'))
 
-		expect(exitSpy).toHaveBeenCalledWith(1)
+		await vi.waitFor(() => expect(exitSpy).toHaveBeenCalledWith(1))
 	})
 
-	it('exits 1 on an uncaught exception', () => {
+	it('exits 1 on an uncaught exception', async () => {
 		onUncaughtException(new Error('itest uncaught exception'))
 
-		expect(exitSpy).toHaveBeenCalledWith(1)
+		await vi.waitFor(() => expect(exitSpy).toHaveBeenCalledWith(1))
 	})
 })
 

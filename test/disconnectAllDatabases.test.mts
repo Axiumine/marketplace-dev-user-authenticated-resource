@@ -4,10 +4,11 @@ const RedisDisconnect = vi.fn()
 const MongoDBDisconnect = vi.fn()
 const captureMessage = vi.fn()
 const captureException = vi.fn()
+const flush = vi.fn()
 
 vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ RedisDisconnect }))
 vi.mock('@axiumine/koa-utils/dataSources/MongoDB', () => ({ MongoDBDisconnect }))
-vi.mock('@sentry/node', () => ({ captureMessage, captureException }))
+vi.mock('@sentry/node', () => ({ captureMessage, captureException, flush }))
 
 const { disconnectAllDatabases } = await import('../src/lib/db/disconnectAllDatabases.mts')
 
@@ -21,6 +22,7 @@ describe('disconnectAllDatabases', () => {
 		MongoDBDisconnect.mockReset().mockResolvedValue(undefined)
 		captureMessage.mockReset()
 		captureException.mockReset()
+		flush.mockReset().mockResolvedValue(true)
 		exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
 	})
 
@@ -35,6 +37,27 @@ describe('disconnectAllDatabases', () => {
 		expect(RedisDisconnect).toHaveBeenCalledTimes(1)
 		expect(MongoDBDisconnect).toHaveBeenCalledTimes(1)
 		expect(captureMessage).toHaveBeenCalledWith('All databases disconnected successfully', 'info')
+		expect(flush).toHaveBeenCalledExactlyOnceWith(2000)
+		expect(exit).toHaveBeenCalledExactlyOnceWith(0)
+	})
+
+	// This is the last stop before the process dies on every fatal path that routes through here
+	// (including start()'s own catch), so process.exit() must wait on the flush settling — not just
+	// happen to run after it is called. A mutant that fires exit() straight after captureMessage() and
+	// lets the flush race in the background would pass every assertion above unnoticed.
+	it('does not exit until the flush settles', async () => {
+		let resolveFlush: (value: boolean) => void = () => undefined
+		flush.mockReturnValueOnce(new Promise<boolean>((resolve) => (resolveFlush = resolve)))
+
+		const pending = disconnectAllDatabases()
+		await Promise.resolve()
+		await Promise.resolve()
+		await Promise.resolve()
+		expect(exit).not.toHaveBeenCalled()
+
+		resolveFlush(true)
+		await pending
+
 		expect(exit).toHaveBeenCalledExactlyOnceWith(0)
 	})
 
@@ -53,6 +76,7 @@ describe('disconnectAllDatabases', () => {
 		expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
 			extra: { detail: 'Error during database disconnection' }
 		})
+		expect(flush).toHaveBeenCalledExactlyOnceWith(2000)
 		expect(exit).toHaveBeenCalledExactlyOnceWith(1)
 	})
 
@@ -63,6 +87,26 @@ describe('disconnectAllDatabases', () => {
 
 		expect(captureMessage).not.toHaveBeenCalled()
 		expect(captureException).toHaveBeenCalledTimes(1)
+		expect(flush).toHaveBeenCalledExactlyOnceWith(2000)
+		expect(exit).toHaveBeenCalledExactlyOnceWith(1)
+	})
+
+	// Same ordering guarantee as the success arm, pinned separately because the catch block flushes
+	// from a different call site.
+	it('does not exit until the flush settles on the failure arm either', async () => {
+		RedisDisconnect.mockRejectedValueOnce(new Error('redis down'))
+		let resolveFlush: (value: boolean) => void = () => undefined
+		flush.mockReturnValueOnce(new Promise<boolean>((resolve) => (resolveFlush = resolve)))
+
+		const pending = disconnectAllDatabases()
+		await Promise.resolve()
+		await Promise.resolve()
+		await Promise.resolve()
+		expect(exit).not.toHaveBeenCalled()
+
+		resolveFlush(true)
+		await pending
+
 		expect(exit).toHaveBeenCalledExactlyOnceWith(1)
 	})
 
@@ -79,6 +123,7 @@ describe('disconnectAllDatabases', () => {
 
 		expect(captureException).toHaveBeenCalledTimes(1)
 		expect(captureException.mock.calls[0][0]).toMatchObject({ message: 'Database disconnection timeout' })
+		expect(flush).toHaveBeenCalledExactlyOnceWith(2000)
 		expect(exit).toHaveBeenCalledExactlyOnceWith(1)
 	})
 })

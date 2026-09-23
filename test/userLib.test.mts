@@ -91,6 +91,25 @@ describe('throwIfUserDontOwnAddress', () => {
 
 		expect(await rejection(throwIfUserDontOwnAddress(userId, addressId))).toEqual({ title: 'Forbidden', status: 403 })
 	})
+
+	// `addressId` is a bare GraphQLID: nothing upstream confirms it is a well-formed ObjectId before it
+	// gets here. Left to Mongoose, this would fail the cast inside the query below and surface as a raw
+	// CastError — a third, distinguishable response next to the 403 above and the 404 this file
+	// deliberately never sends. The 400 has to come from here, and before any query is built.
+	it('answers 400 when the address id is not a well-formed ObjectId', async () => {
+		const malformed = 'not-an-id' as unknown as Types.ObjectId
+
+		expect(await rejection(throwIfUserDontOwnAddress(userId, malformed))).toEqual({ title: 'Bad Request', status: 400 })
+		expect(userCountDocuments).not.toHaveBeenCalled()
+	})
+
+	it('names the bad argument in the description the client renders', async () => {
+		const malformed = 'not-an-id' as unknown as Types.ObjectId
+
+		await expect(throwIfUserDontOwnAddress(userId, malformed)).rejects.toMatchObject({
+			extensions: { description: 'addressId is not a valid id' }
+		})
+	})
 })
 
 describe('funUserAddressAdd', () => {
@@ -465,6 +484,28 @@ describe('funUserUpdatePwd', () => {
 			title: 'Bad Request',
 			status: 400
 		})
+	})
+
+	// `checkPwdLen` counts UTF-16 code units, so 71 ASCII bytes plus one accented character still reads
+	// as 72 characters and clears it — but 'é' is 2 bytes in UTF-8, so the string is 73 bytes, past what
+	// bcrypt hashes. `assertPasswordByteLength` is the only guard that catches this.
+	it('refuses a 72-character new password that is more than 72 UTF-8 bytes', async () => {
+		const password = 'a'.repeat(71) + 'é'
+
+		expect(password).toHaveLength(72)
+		expect(await rejection(funUserUpdatePwd(userId, 'old-password', password))).toEqual({
+			title: 'Bad Request',
+			status: 400
+		})
+		expect(userFindById).not.toHaveBeenCalled()
+	})
+
+	it('accepts a new password of exactly 72 UTF-8 bytes', async () => {
+		const password = 'a'.repeat(72)
+
+		await funUserUpdatePwd(userId, 'old-password', password)
+
+		expect(encryptPassword).toHaveBeenCalledExactlyOnceWith(password)
 	})
 
 	// Rejected because it is almost always an accident, and because letting it through spends a

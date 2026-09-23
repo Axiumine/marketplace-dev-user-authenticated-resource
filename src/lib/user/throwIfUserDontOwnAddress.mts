@@ -1,3 +1,4 @@
+import { throwErrorWrongUserInput } from '@axiumine/koa-utils/graphQL/throw/throwErrorWrongUserInput'
 import { throwForbiddenError } from '@axiumine/koa-utils/graphQL/throw/throwForbiddenError'
 import { User } from '@axiumine/marketplace-common/models/MongoDB/User'
 import { Types } from 'mongoose'
@@ -25,6 +26,15 @@ import { Types } from 'mongoose'
  * either: `authorizationAuthenticatedResourceHandler` never sees it, and it is the login path's job.
  */
 export async function throwIfUserDontOwnAddress(userId: Types.ObjectId, addressId: Types.ObjectId) {
+	// `addressId` is a bare GraphQLID, so nothing upstream has confirmed it is a well-formed ObjectId.
+	// Left to Mongoose, a malformed one fails the cast on the query below with a raw CastError — no
+	// try/catch here or at the three call sites to route it through tryCatchRethrow/Sentry, so it would
+	// reach the client verbatim, a third, distinguishable response next to the 403 above and the 404
+	// this file deliberately never sends. Reject it with the platform's clean 400 before any query runs.
+	if (!Types.ObjectId.isValid(addressId)) {
+		throw throwErrorWrongUserInput('addressId is not a valid id')
+	}
+
 	const found = await User.countDocuments({ _id: userId, 'addresses._id': addressId }).lean()
 
 	if (found === 0) {

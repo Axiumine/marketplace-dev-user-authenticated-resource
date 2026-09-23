@@ -5,6 +5,7 @@ import { checkPwdLen } from '@axiumine/koa-utils/lib/checkPwdLen'
 import { encryptPassword } from '@axiumine/koa-utils/lib/encryptPassword'
 import { compareHashAsync } from '@axiumine/koa-utils/lib/hash'
 import { User } from '@axiumine/marketplace-common/models/MongoDB/User'
+import { assertPasswordByteLength } from '@axiumine/marketplace-common/others/assertPasswordByteLength'
 import { checkUserAuthorizationDisDel } from '@axiumine/marketplace-common/others/checkUserAuthorizationDisDel'
 import { Types } from 'mongoose'
 
@@ -23,6 +24,10 @@ export async function funUserUpdatePwd(_id: Types.ObjectId, passwordOld: string,
 	// The OLD password is deliberately not length-checked — it is compared, not accepted, and
 	// validating it would only report which guesses were the wrong shape.
 	checkPwdLen(passwordNew)
+	// `checkPwdLen` counts UTF-16 code units; this counts UTF-8 bytes, the unit bcrypt truncates on. A
+	// password heavy in emoji, accents or CJK can clear the check above while still running past 72
+	// bytes. Same refusal shape as `checkPwdLen`'s own too-long branch — see the helper's own doc.
+	assertPasswordByteLength(passwordNew)
 
 	// Rejected because it is almost always an accident, and because letting it through would spend a
 	// bcrypt hash at cost factor 14 to write back a value that is already there.
