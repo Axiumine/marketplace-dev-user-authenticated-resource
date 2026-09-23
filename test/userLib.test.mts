@@ -486,6 +486,28 @@ describe('funUserUpdatePwd', () => {
 		})
 	})
 
+	// `checkPwdLen` counts UTF-16 code units, so 71 ASCII bytes plus one accented character still reads
+	// as 72 characters and clears it — but 'é' is 2 bytes in UTF-8, so the string is 73 bytes, past what
+	// bcrypt hashes. `assertPasswordByteLength` is the only guard that catches this.
+	it('refuses a 72-character new password that is more than 72 UTF-8 bytes', async () => {
+		const password = 'a'.repeat(71) + 'é'
+
+		expect(password).toHaveLength(72)
+		expect(await rejection(funUserUpdatePwd(userId, 'old-password', password))).toEqual({
+			title: 'Bad Request',
+			status: 400
+		})
+		expect(userFindById).not.toHaveBeenCalled()
+	})
+
+	it('accepts a new password of exactly 72 UTF-8 bytes', async () => {
+		const password = 'a'.repeat(72)
+
+		await funUserUpdatePwd(userId, 'old-password', password)
+
+		expect(encryptPassword).toHaveBeenCalledExactlyOnceWith(password)
+	})
+
 	// Rejected because it is almost always an accident, and because letting it through spends a
 	// bcrypt hash at cost factor 14 to write back a value that is already stored.
 	it('refuses a new password identical to the old one', async () => {
