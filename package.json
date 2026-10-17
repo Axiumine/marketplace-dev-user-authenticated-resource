@@ -47,7 +47,7 @@
     "graphql-scalars": "^2.0.0",
     "koa": "^3.2.1",
     "koa-bodyparser": "^4.4.1",
-    "mongodb": "^7.5.0",
+    "mongodb": "^7.7.0",
     "mongodb-client-encryption": "^7.2.1",
     "mongoose": "^9.9.1",
     "redis": "^6.2.0",
