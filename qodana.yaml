@@ -19,13 +19,13 @@ image: jetbrains/qodana-js:2026.2
 
 # ── SCA: third-party license audit (Ultimate Plus) ────────────────────────────
 # Scans npm/Yarn deps and surfaces license conflicts as problems. The project is
-# proprietary (package.json "UNLICENSED"), so Qodana's default compatibility
-# matrix already flags copyleft dependencies. Tighten per-project below if needed.
+# GPL-3.0-or-later (package.json "license"); `licenseRules` below states which dependency
+# licenses are accepted against it. Tighten per-project below if needed.
 raiseLicenseProblems: true
 
 # `keys` is THIS project's license, `allowed` the dependency licenses accepted
-# against it. The default matrix for a proprietary project flags every copyleft
-# dep as a Critical — correct for shipped software, wrong here: these services are
+# against it. Qodana's default matrix flags copyleft dependencies as Critical —
+# correct for shipped software, wrong here: these services are
 # never distributed, they run on our own hosts behind nginx, so the GPL's
 # distribution trigger is never pulled. Accepted by the project owner.
 #
@@ -39,10 +39,9 @@ raiseLicenseProblems: true
 # "…is in the prohibited licenses list with project license 'PROPRIETARY-LICENSE'".
 # Putting "UNLICENSED" here matches no project and the rule silently does nothing.
 #
-# PROPRIETARY-LICENSE is in `allowed` as well so that a proprietary dependency
-# under the same owner as this proprietary project is not read as a conflict.
-# marketplace-common is no longer one of those — it is GPL-3.0-or-later now, and
-# is covered by the GPL entries alongside it.
+# PROPRIETARY-LICENSE is in `allowed` as well, a leftover from when marketplace-common was
+# proprietary and had to not be read as a conflict. marketplace-common is no longer one of
+# those — it is GPL-3.0-or-later now, and is covered by the GPL entries alongside it.
 #
 # MPL-2.0 covers lightningcss, which arrives only as `vitest -> vite -> lightningcss`
 # (`yarn why` confirms that single path). It is a build-time devDependency: never
