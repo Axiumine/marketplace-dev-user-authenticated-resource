@@ -30,17 +30,17 @@ import { GraphQLUserAddress, GraphQLUserPersonalData } from './GraphQLUserMe.mjs
  * across accounts, so no field of `user` has to become deterministically encrypted to serve it.
  */
 export const GraphQLUserExport = new GraphQLObjectType({
-	name: 'GraphQLUserExport',
-	fields: () => ({
-		_id: { type: new GraphQLNonNull(GraphQLID) },
-		email: { type: new GraphQLNonNull(GraphQLString) },
-		personalData: { type: GraphQLUserPersonalData },
-		addresses: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLUserAddress))) },
-		defaultAddress: { type: GraphQLID },
-		registeredAt: { type: new GraphQLNonNull(GraphQLDateTime) },
-		// Both nullable, and not by oversight: the collection writes them at the first and the latest
-		// login, so an account that registered and never confirmed its email has neither.
-		firstLogin: { type: GraphQLDateTime },
-		lastLogin: { type: GraphQLDateTime }
-	})
+  name: 'GraphQLUserExport',
+  fields: () => ({
+    _id: { type: new GraphQLNonNull(GraphQLID) },
+    email: { type: new GraphQLNonNull(GraphQLString) },
+    personalData: { type: GraphQLUserPersonalData },
+    addresses: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLUserAddress))) },
+    defaultAddress: { type: GraphQLID },
+    registeredAt: { type: new GraphQLNonNull(GraphQLDateTime) },
+    // Both nullable, and not by oversight: the collection writes them at the first and the latest
+    // login, so an account that registered and never confirmed its email has neither.
+    firstLogin: { type: GraphQLDateTime },
+    lastLogin: { type: GraphQLDateTime }
+  })
 })

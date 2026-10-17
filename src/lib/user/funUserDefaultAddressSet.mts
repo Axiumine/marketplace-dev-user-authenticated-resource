@@ -20,9 +20,9 @@ import { Types } from 'mongoose'
  * is double-clicked, and MongoDB reports that as modified 0.
  */
 export async function funUserDefaultAddressSet(_id: Types.ObjectId, addressId: Types.ObjectId) {
-	const ret = await User.updateOne({ _id: _id }, { $set: { defaultAddress: addressId } }).exec()
+  const ret = await User.updateOne({ _id: _id }, { $set: { defaultAddress: addressId } }).exec()
 
-	if (ret.matchedCount !== 1) {
-		throwInternalError()
-	}
+  if (ret.matchedCount !== 1) {
+    throwInternalError()
+  }
 }

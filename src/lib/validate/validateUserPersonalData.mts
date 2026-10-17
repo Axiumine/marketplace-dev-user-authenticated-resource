@@ -27,14 +27,14 @@ const MAX_PHONE = 12
  * so `User.mts`'s inline `type: { _id: false, … }` type-checks, and it is not a field anybody writes.
  */
 export type IUserPersonalDataInput = {
-	firstName: string
-	lastName: string
-	birth?: { date: Date } | null
-	contacts?: {
-		mobile?: string | null
-		landline?: string | null
-		email?: string | null
-	} | null
+  firstName: string
+  lastName: string
+  birth?: { date: Date } | null
+  contacts?: {
+    mobile?: string | null
+    landline?: string | null
+    email?: string | null
+  } | null
 }
 
 /**
@@ -55,24 +55,24 @@ export type IUserPersonalDataInput = {
  * from both sides without freezing time.
  */
 export const validateUserPersonalData = (personalData: IUserPersonalDataInput, today: Date): IUserPersonalData => {
-	// `== null` on purpose: absent and explicitly null both mean "the customer did not give this", and
-	// the GraphQL input makes both objects nullable, so the client can send either.
-	const birth = personalData.birth == null ? undefined : { date: birthDate(personalData.birth.date, 'birth.date', today) }
+  // `== null` on purpose: absent and explicitly null both mean "the customer did not give this", and
+  // the GraphQL input makes both objects nullable, so the client can send either.
+  const birth = personalData.birth == null ? undefined : { date: birthDate(personalData.birth.date, 'birth.date', today) }
 
-	const mobile = optionalText(personalData.contacts?.mobile, 'contacts.mobile', MAX_PHONE)
-	const landline = optionalText(personalData.contacts?.landline, 'contacts.landline', MAX_PHONE)
-	const email = optionalEmail(personalData.contacts?.email, 'contacts.email')
+  const mobile = optionalText(personalData.contacts?.mobile, 'contacts.mobile', MAX_PHONE)
+  const landline = optionalText(personalData.contacts?.landline, 'contacts.landline', MAX_PHONE)
+  const email = optionalEmail(personalData.contacts?.email, 'contacts.email')
 
-	const contacts = {
-		...(mobile === undefined ? {} : { mobile }),
-		...(landline === undefined ? {} : { landline }),
-		...(email === undefined ? {} : { email })
-	}
+  const contacts = {
+    ...(mobile === undefined ? {} : { mobile }),
+    ...(landline === undefined ? {} : { landline }),
+    ...(email === undefined ? {} : { email })
+  }
 
-	return {
-		firstName: requiredText(personalData.firstName, 'firstName', MAX_FIRST_NAME),
-		lastName: requiredText(personalData.lastName, 'lastName', MAX_LAST_NAME),
-		...(birth === undefined ? {} : { birth }),
-		...(Object.keys(contacts).length === 0 ? {} : { contacts })
-	}
+  return {
+    firstName: requiredText(personalData.firstName, 'firstName', MAX_FIRST_NAME),
+    lastName: requiredText(personalData.lastName, 'lastName', MAX_LAST_NAME),
+    ...(birth === undefined ? {} : { birth }),
+    ...(Object.keys(contacts).length === 0 ? {} : { contacts })
+  }
 }

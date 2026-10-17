@@ -25,17 +25,17 @@ import { GraphQLDateTime } from 'graphql-scalars'
  * places to disagree about which one is default.
  */
 export const GraphQLUserMe = new GraphQLObjectType({
-	name: 'GraphQLUserMe',
-	fields: () => ({
-		_id: { type: new GraphQLNonNull(GraphQLID) },
-		email: { type: new GraphQLNonNull(GraphQLString) },
-		personalData: { type: GraphQLUserPersonalData },
-		// NonNull list of NonNull elements, and empty when nothing has been saved — `me` defaults it, so
-		// a client never has to distinguish "no addresses" from "the field was not sent".
-		addresses: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLUserAddress))) },
-		defaultAddress: { type: GraphQLID },
-		registeredAt: { type: new GraphQLNonNull(GraphQLDateTime) }
-	})
+  name: 'GraphQLUserMe',
+  fields: () => ({
+    _id: { type: new GraphQLNonNull(GraphQLID) },
+    email: { type: new GraphQLNonNull(GraphQLString) },
+    personalData: { type: GraphQLUserPersonalData },
+    // NonNull list of NonNull elements, and empty when nothing has been saved — `me` defaults it, so
+    // a client never has to distinguish "no addresses" from "the field was not sent".
+    addresses: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLUserAddress))) },
+    defaultAddress: { type: GraphQLID },
+    registeredAt: { type: new GraphQLNonNull(GraphQLDateTime) }
+  })
 })
 
 /**
@@ -44,30 +44,30 @@ export const GraphQLUserMe = new GraphQLObjectType({
  * a customer types a name into a profile page and leaves the rest.
  */
 export const GraphQLUserPersonalData = new GraphQLObjectType({
-	name: 'GraphQLUserPersonalData',
-	fields: () => ({
-		firstName: { type: new GraphQLNonNull(GraphQLString) },
-		lastName: { type: new GraphQLNonNull(GraphQLString) },
-		birth: { type: GraphQLUserBirth },
-		contacts: { type: GraphQLUserContacts }
-	})
+  name: 'GraphQLUserPersonalData',
+  fields: () => ({
+    firstName: { type: new GraphQLNonNull(GraphQLString) },
+    lastName: { type: new GraphQLNonNull(GraphQLString) },
+    birth: { type: GraphQLUserBirth },
+    contacts: { type: GraphQLUserContacts }
+  })
 })
 
 const GraphQLUserBirth = new GraphQLObjectType({
-	name: 'GraphQLUserBirth',
-	fields: () => ({
-		date: { type: new GraphQLNonNull(GraphQLDateTime) }
-	})
+  name: 'GraphQLUserBirth',
+  fields: () => ({
+    date: { type: new GraphQLNonNull(GraphQLDateTime) }
+  })
 })
 
 /** Every member optional: `login.email` is the credential, these are other ways to be reached. */
 const GraphQLUserContacts = new GraphQLObjectType({
-	name: 'GraphQLUserContacts',
-	fields: () => ({
-		mobile: { type: GraphQLString },
-		landline: { type: GraphQLString },
-		email: { type: GraphQLString }
-	})
+  name: 'GraphQLUserContacts',
+  fields: () => ({
+    mobile: { type: GraphQLString },
+    landline: { type: GraphQLString },
+    email: { type: GraphQLString }
+  })
 })
 
 /**
@@ -82,18 +82,18 @@ const GraphQLUserContacts = new GraphQLObjectType({
  * is picked from the geocoder's autocomplete, and one typed by hand has no map until it is re-picked.
  */
 export const GraphQLUserAddress = new GraphQLObjectType({
-	name: 'GraphQLUserAddress',
-	fields: () => ({
-		_id: { type: new GraphQLNonNull(GraphQLID) },
-		...GraphQLBaseAddressFrag,
-		label: { type: GraphQLString },
-		position: { type: GraphQLUserPosition }
-	})
+  name: 'GraphQLUserAddress',
+  fields: () => ({
+    _id: { type: new GraphQLNonNull(GraphQLID) },
+    ...GraphQLBaseAddressFrag,
+    label: { type: GraphQLString },
+    position: { type: GraphQLUserPosition }
+  })
 })
 
 const GraphQLUserPosition = new GraphQLObjectType({
-	name: 'GraphQLUserPosition',
-	fields: () => ({
-		...GraphQLPositionFrag
-	})
+  name: 'GraphQLUserPosition',
+  fields: () => ({
+    ...GraphQLPositionFrag
+  })
 })

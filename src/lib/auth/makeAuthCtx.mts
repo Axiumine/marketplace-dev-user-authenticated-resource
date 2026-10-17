@@ -16,8 +16,8 @@ import { Types } from 'mongoose'
  * session rather than from the ownership guard in front of it.
  */
 export function makeAuthCtx(redData: IRedisDataUser): IRedisDataUserForNode {
-	return {
-		_id: new Types.ObjectId(redData._id),
-		email: redData.email
-	}
+  return {
+    _id: new Types.ObjectId(redData._id),
+    email: redData.email
+  }
 }

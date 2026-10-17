@@ -9,16 +9,16 @@ import { userPersonalDataUpdate } from './mutations/userPersonalDataUpdate.mjs'
 import { userUpdatePwd } from './mutations/userUpdatePwd.mjs'
 
 const MutationsApi = new GraphQLObjectType({
-	name: 'MutationsApi',
-	fields: {
-		userAddressAdd,
-		userAddressDel,
-		userAddressUpdate,
-		userDefaultAddressSet,
-		userDel,
-		userPersonalDataUpdate,
-		userUpdatePwd
-	}
+  name: 'MutationsApi',
+  fields: {
+    userAddressAdd,
+    userAddressDel,
+    userAddressUpdate,
+    userDefaultAddressSet,
+    userDel,
+    userPersonalDataUpdate,
+    userUpdatePwd
+  }
 })
 
 export default MutationsApi

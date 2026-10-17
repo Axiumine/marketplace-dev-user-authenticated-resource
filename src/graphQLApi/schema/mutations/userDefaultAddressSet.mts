@@ -6,7 +6,7 @@ import { GraphQLBoolean, GraphQLError, GraphQLID, GraphQLNonNull } from 'graphql
 import { Types } from 'mongoose'
 
 interface IArgs {
-	_id: Types.ObjectId
+  _id: Types.ObjectId
 }
 
 /**
@@ -25,20 +25,20 @@ interface IArgs {
  * and the guard has just established that this one names an address of this account.
  */
 export const userDefaultAddressSet = {
-	type: new GraphQLNonNull(GraphQLBoolean),
-	description: 'set the default address of the signed-in customer',
-	args: {
-		_id: { type: new GraphQLNonNull(GraphQLID) }
-	},
-	async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
-		await throwIfUserDontOwnAddress(ctx.state.user._id, args._id)
+  type: new GraphQLNonNull(GraphQLBoolean),
+  description: 'set the default address of the signed-in customer',
+  args: {
+    _id: { type: new GraphQLNonNull(GraphQLID) }
+  },
+  async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
+    await throwIfUserDontOwnAddress(ctx.state.user._id, args._id)
 
-		try {
-			await funUserDefaultAddressSet(ctx.state.user._id, args._id)
-		} catch (e) {
-			tryCatchRethrow(e as GraphQLError | Error)
-		}
+    try {
+      await funUserDefaultAddressSet(ctx.state.user._id, args._id)
+    } catch (e) {
+      tryCatchRethrow(e as GraphQLError | Error)
+    }
 
-		return true
-	}
+    return true
+  }
 }

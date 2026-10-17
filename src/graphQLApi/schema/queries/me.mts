@@ -26,24 +26,24 @@ import { GraphQLNonNull } from 'graphql'
  * `null` account the private area would have to render.
  */
 export const me = {
-	type: new GraphQLNonNull(GraphQLUserMe),
-	description: 'the signed-in customer own account',
-	async resolve(_: unknown, {}, ctx: IContextUserAuthenticatedResource) {
-		const user = await User.findById(ctx.state.user._id)
-			.select('_id login.email personalData addresses defaultAddress registeredAt')
-			.lean()
+  type: new GraphQLNonNull(GraphQLUserMe),
+  description: 'the signed-in customer own account',
+  async resolve(_: unknown, {}, ctx: IContextUserAuthenticatedResource) {
+    const user = await User.findById(ctx.state.user._id)
+      .select('_id login.email personalData addresses defaultAddress registeredAt')
+      .lean()
 
-		if (user === null) {
-			throwUnauthorizedError()
-		}
+    if (user === null) {
+      throwUnauthorizedError()
+    }
 
-		return {
-			_id: user._id,
-			email: user.login.email,
-			personalData: user.personalData,
-			addresses: user.addresses ?? [],
-			defaultAddress: user.defaultAddress,
-			registeredAt: user.registeredAt
-		}
-	}
+    return {
+      _id: user._id,
+      email: user.login.email,
+      personalData: user.personalData,
+      addresses: user.addresses ?? [],
+      defaultAddress: user.defaultAddress,
+      registeredAt: user.registeredAt
+    }
+  }
 }
