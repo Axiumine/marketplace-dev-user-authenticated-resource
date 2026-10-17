@@ -6,7 +6,7 @@ import { IUserPersonalDataInput, validateUserPersonalData } from '@lib/validate/
 import { GraphQLBoolean, GraphQLError, GraphQLNonNull } from 'graphql'
 
 interface IArgs {
-	personalData: IUserPersonalDataInput
+  personalData: IUserPersonalDataInput
 }
 
 /**
@@ -18,20 +18,20 @@ interface IArgs {
  * unit tests can move without freezing the clock.
  */
 export const userPersonalDataUpdate = {
-	type: new GraphQLNonNull(GraphQLBoolean),
-	description: 'update the signed-in customer personal data',
-	args: {
-		personalData: { type: new GraphQLNonNull(GraphQLInputUserPersonalData) }
-	},
-	async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
-		const personalData = validateUserPersonalData(args.personalData, new Date())
+  type: new GraphQLNonNull(GraphQLBoolean),
+  description: 'update the signed-in customer personal data',
+  args: {
+    personalData: { type: new GraphQLNonNull(GraphQLInputUserPersonalData) }
+  },
+  async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
+    const personalData = validateUserPersonalData(args.personalData, new Date())
 
-		try {
-			await funUserPersonalDataUpdate(ctx.state.user._id, personalData)
-		} catch (e) {
-			tryCatchRethrow(e as GraphQLError | Error)
-		}
+    try {
+      await funUserPersonalDataUpdate(ctx.state.user._id, personalData)
+    } catch (e) {
+      tryCatchRethrow(e as GraphQLError | Error)
+    }
 
-		return true
-	}
+    return true
+  }
 }

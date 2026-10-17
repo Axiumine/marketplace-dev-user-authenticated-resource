@@ -21,24 +21,24 @@ import { nodeNextResolver } from './vitest.shared.mts'
 const inlineDeps = [/graphql/, /@apollo\/server/, /@as-integrations/, /@axiumine\/koa-utils/, /@axiumine\/marketplace-common/]
 
 export default defineConfig({
-	plugins: [nodeNextResolver],
-	resolve: { dedupe: ['graphql'] },
-	test: {
-		include: ['test/*.test.mts'],
-		server: { deps: { inline: inlineDeps } },
-		// Not present in the `unit` project of vitest.config.mts (which relies on the 5s
-		// default) — added here only as a safety margin, since Stryker re-runs the suite
-		// once per mutant through its own instrumentation and that adds overhead the plain
-		// vitest run does not have.
-		testTimeout: 30_000,
-		// Caps how long a test's full name may be — the mutation gate selects tests by name,
-		// and past a size it cannot; see vitest.testNames.mts.
-		setupFiles: ['./vitest.testNames.mts'],
-		// Same as the `unit` project: set before the sources call `dotenv.config()`,
-		// which does not override keys already present in process.env.
-		env: {
-			NODE_ENV: 'test',
-			REDIS_KEY: 'test:'
-		}
-	}
+  plugins: [nodeNextResolver],
+  resolve: { dedupe: ['graphql'] },
+  test: {
+    include: ['test/*.test.mts'],
+    server: { deps: { inline: inlineDeps } },
+    // Not present in the `unit` project of vitest.config.mts (which relies on the 5s
+    // default) — added here only as a safety margin, since Stryker re-runs the suite
+    // once per mutant through its own instrumentation and that adds overhead the plain
+    // vitest run does not have.
+    testTimeout: 30_000,
+    // Caps how long a test's full name may be — the mutation gate selects tests by name,
+    // and past a size it cannot; see vitest.testNames.mts.
+    setupFiles: ['./vitest.testNames.mts'],
+    // Same as the `unit` project: set before the sources call `dotenv.config()`,
+    // which does not override keys already present in process.env.
+    env: {
+      NODE_ENV: 'test',
+      REDIS_KEY: 'test:'
+    }
+  }
 })

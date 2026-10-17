@@ -1,11 +1,11 @@
 import { IUserAddress } from '@axiumine/marketplace-common/models/MongoDBInterfaces/IUserAddress'
 import {
-	coordinate,
-	optionalText,
-	requiredText,
-	SHAPE_POSTAL_CODE,
-	SHAPE_PROVINCE,
-	textWithFormat
+  coordinate,
+  optionalText,
+  requiredText,
+  SHAPE_POSTAL_CODE,
+  SHAPE_PROVINCE,
+  textWithFormat
 } from '@lib/validate/fields.mjs'
 
 /*
@@ -49,8 +49,8 @@ const POSITION_TYPE = 'Point'
 // `label?: string` (no null), and leaving it out of the Omit would intersect that with the `string |
 // null` below into plain `string` — silently dropping the null this type exists to accept.
 export type IUserAddressInput = Omit<IUserAddress, '_id' | 'position' | 'label'> & {
-	label?: string | null
-	position?: { coordinates: number[] } | null
+  label?: string | null
+  position?: { coordinates: number[] } | null
 }
 
 /**
@@ -63,28 +63,28 @@ export type IUserAddressInput = Omit<IUserAddress, '_id' | 'position' | 'label'>
  * `undefined` as `null` and `null` fails the element's `additionalProperties: false` shape.
  */
 export const validateUserAddress = (address: IUserAddressInput): Omit<IUserAddress, '_id'> => {
-	const label = optionalText(address.label, 'label', MAX_LABEL)
+  const label = optionalText(address.label, 'label', MAX_LABEL)
 
-	// `== null` on purpose: absent and explicitly null both mean "this address has no point". An
-	// address typed by hand has none until it is re-picked from the geocoder's autocomplete.
-	const position = address.position == null ? undefined : address.position
+  // `== null` on purpose: absent and explicitly null both mean "this address has no point". An
+  // address typed by hand has none until it is re-picked from the geocoder's autocomplete.
+  const position = address.position == null ? undefined : address.position
 
-	return {
-		street: requiredText(address.street, 'street', MAX_ADDRESS),
-		postalCode: textWithFormat(address.postalCode, 'postalCode', SHAPE_POSTAL_CODE, 'the postal code is 5 digits'),
-		city: requiredText(address.city, 'city', MAX_CITY),
-		// Upper-cased on the way in, so `mi` and `MI` are one value in the database rather than two that
-		// sort apart and compare unequal. The pattern accepts either case on purpose — refusing a
-		// lower-case province code would be a validation error over something the server can simply fix.
-		province: textWithFormat(address.province, 'province', SHAPE_PROVINCE, 'the province is the 2-letter code').toUpperCase(),
-		...(label === undefined ? {} : { label }),
-		...(position === undefined
-			? {}
-			: {
-					position: {
-						type: POSITION_TYPE,
-						coordinates: coordinate(position.coordinates, 'position.coordinates')
-					}
-				})
-	}
+  return {
+    street: requiredText(address.street, 'street', MAX_ADDRESS),
+    postalCode: textWithFormat(address.postalCode, 'postalCode', SHAPE_POSTAL_CODE, 'the postal code is 5 digits'),
+    city: requiredText(address.city, 'city', MAX_CITY),
+    // Upper-cased on the way in, so `mi` and `MI` are one value in the database rather than two that
+    // sort apart and compare unequal. The pattern accepts either case on purpose — refusing a
+    // lower-case province code would be a validation error over something the server can simply fix.
+    province: textWithFormat(address.province, 'province', SHAPE_PROVINCE, 'the province is the 2-letter code').toUpperCase(),
+    ...(label === undefined ? {} : { label }),
+    ...(position === undefined
+      ? {}
+      : {
+          position: {
+            type: POSITION_TYPE,
+            coordinates: coordinate(position.coordinates, 'position.coordinates')
+          }
+        })
+  }
 }

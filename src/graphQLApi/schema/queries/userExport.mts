@@ -26,26 +26,26 @@ import { GraphQLNonNull } from 'graphql'
  * A `null` means the session outlived the document — 401, so the client re-logins.
  */
 export const userExport = {
-	type: new GraphQLNonNull(GraphQLUserExport),
-	description: 'the signed-in customer own record, for a GDPR Art. 20 export',
-	async resolve(_: unknown, {}, ctx: IContextUserAuthenticatedResource) {
-		const user = await User.findById(ctx.state.user._id)
-			.select('_id login.email login.firstLogin login.lastLogin personalData addresses defaultAddress registeredAt')
-			.lean()
+  type: new GraphQLNonNull(GraphQLUserExport),
+  description: 'the signed-in customer own record, for a GDPR Art. 20 export',
+  async resolve(_: unknown, {}, ctx: IContextUserAuthenticatedResource) {
+    const user = await User.findById(ctx.state.user._id)
+      .select('_id login.email login.firstLogin login.lastLogin personalData addresses defaultAddress registeredAt')
+      .lean()
 
-		if (user === null) {
-			throwUnauthorizedError()
-		}
+    if (user === null) {
+      throwUnauthorizedError()
+    }
 
-		return {
-			_id: user._id,
-			email: user.login.email,
-			personalData: user.personalData,
-			addresses: user.addresses ?? [],
-			defaultAddress: user.defaultAddress,
-			registeredAt: user.registeredAt,
-			firstLogin: user.login.firstLogin,
-			lastLogin: user.login.lastLogin
-		}
-	}
+    return {
+      _id: user._id,
+      email: user.login.email,
+      personalData: user.personalData,
+      addresses: user.addresses ?? [],
+      defaultAddress: user.defaultAddress,
+      registeredAt: user.registeredAt,
+      firstLogin: user.login.firstLogin,
+      lastLogin: user.login.lastLogin
+    }
+  }
 }

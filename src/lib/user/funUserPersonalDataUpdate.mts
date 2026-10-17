@@ -21,9 +21,9 @@ import { Types } from 'mongoose'
  * the database holds exactly what they asked for.
  */
 export async function funUserPersonalDataUpdate(_id: Types.ObjectId, personalData: IUserPersonalData) {
-	const ret = await User.updateOne({ _id: _id }, { $set: { personalData: personalData } }).exec()
+  const ret = await User.updateOne({ _id: _id }, { $set: { personalData: personalData } }).exec()
 
-	if (ret.matchedCount !== 1) {
-		throwInternalError()
-	}
+  if (ret.matchedCount !== 1) {
+    throwInternalError()
+  }
 }

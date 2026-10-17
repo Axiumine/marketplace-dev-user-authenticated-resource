@@ -21,14 +21,14 @@ import { Types } from 'mongoose'
  * replacement over a field-by-field merge.
  */
 export async function funUserAddressUpdate(_id: Types.ObjectId, addressId: Types.ObjectId, address: Omit<IUserAddress, '_id'>) {
-	const ret = await User.updateOne(
-		{ _id: _id, 'addresses._id': addressId },
-		{ $set: { 'addresses.$': { ...address, _id: addressId } } }
-	).exec()
+  const ret = await User.updateOne(
+    { _id: _id, 'addresses._id': addressId },
+    { $set: { 'addresses.$': { ...address, _id: addressId } } }
+  ).exec()
 
-	// `matchedCount`, like the profile save and for the same reason: re-saving an address unchanged is
-	// something a form does, and MongoDB reports it as modified 0.
-	if (ret.matchedCount !== 1) {
-		throwInternalError()
-	}
+  // `matchedCount`, like the profile save and for the same reason: re-saving an address unchanged is
+  // something a form does, and MongoDB reports it as modified 0.
+  if (ret.matchedCount !== 1) {
+    throwInternalError()
+  }
 }

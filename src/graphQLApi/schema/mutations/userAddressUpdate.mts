@@ -8,8 +8,8 @@ import { GraphQLBoolean, GraphQLError, GraphQLID, GraphQLNonNull } from 'graphql
 import { Types } from 'mongoose'
 
 interface IArgs {
-	_id: Types.ObjectId
-	address: IUserAddressInput
+  _id: Types.ObjectId
+  address: IUserAddressInput
 }
 
 /**
@@ -22,23 +22,23 @@ interface IArgs {
  * its old value. That is what an edit form means by an empty box.
  */
 export const userAddressUpdate = {
-	type: new GraphQLNonNull(GraphQLBoolean),
-	description: 'update an address of the signed-in customer',
-	args: {
-		_id: { type: new GraphQLNonNull(GraphQLID) },
-		address: { type: new GraphQLNonNull(GraphQLInputUserAddress) }
-	},
-	async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
-		await throwIfUserDontOwnAddress(ctx.state.user._id, args._id)
+  type: new GraphQLNonNull(GraphQLBoolean),
+  description: 'update an address of the signed-in customer',
+  args: {
+    _id: { type: new GraphQLNonNull(GraphQLID) },
+    address: { type: new GraphQLNonNull(GraphQLInputUserAddress) }
+  },
+  async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
+    await throwIfUserDontOwnAddress(ctx.state.user._id, args._id)
 
-		const address = validateUserAddress(args.address)
+    const address = validateUserAddress(args.address)
 
-		try {
-			await funUserAddressUpdate(ctx.state.user._id, args._id, address)
-		} catch (e) {
-			tryCatchRethrow(e as GraphQLError | Error)
-		}
+    try {
+      await funUserAddressUpdate(ctx.state.user._id, args._id, address)
+    } catch (e) {
+      tryCatchRethrow(e as GraphQLError | Error)
+    }
 
-		return true
-	}
+    return true
+  }
 }

@@ -76,15 +76,15 @@ import { trusted, Types } from 'mongoose'
  * state the filter can reach.
  */
 export async function funUserDel(_id: Types.ObjectId) {
-	const ret = await User.updateOne({ _id: _id, deleted: trusted({ $exists: false }) }, { $set: { deleted: new Date() } }).exec()
+  const ret = await User.updateOne({ _id: _id, deleted: trusted({ $exists: false }) }, { $set: { deleted: new Date() } }).exec()
 
-	if (ret.matchedCount !== 1) {
-		const user = await User.findById(_id).select('_id').lean()
+  if (ret.matchedCount !== 1) {
+    const user = await User.findById(_id).select('_id').lean()
 
-		if (user === null) {
-			throwUnauthorizedError()
-		}
+    if (user === null) {
+      throwUnauthorizedError()
+    }
 
-		throwGoneError('account already closed')
-	}
+    throwGoneError('account already closed')
+  }
 }

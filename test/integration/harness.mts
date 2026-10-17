@@ -45,53 +45,53 @@ const seededKeys: string[] = []
 
 /** The raw driver handle — only defined once start() has connected. */
 export function db() {
-	return mongoose.connection.db!
+  return mongoose.connection.db!
 }
 
 let base = ''
 
 /** Boot the real server on an ephemeral port and hand back its handle plus the base URL. */
 export async function bootServer() {
-	const server = await start()
-	if (!server) throw new Error('server failed to start against the real Redis cluster / MongoDB')
+  const server = await start()
+  if (!server) throw new Error('server failed to start against the real Redis cluster / MongoDB')
 
-	const { httpServer } = server
-	const address = httpServer.address() as AddressInfo | null
-	if (!address || typeof address === 'string') throw new Error('no TCP address on the booted server')
+  const { httpServer } = server
+  const address = httpServer.address() as AddressInfo | null
+  if (!address || typeof address === 'string') throw new Error('no TCP address on the booted server')
 
-	base = `http://127.0.0.1:${address.port}`
+  base = `http://127.0.0.1:${address.port}`
 
-	return { httpServer, base }
+  return { httpServer, base }
 }
 
 /** The booted server's origin, for the handful of assertions that fetch something other than GraphQL. */
 export function baseUrl() {
-	return base
+  return base
 }
 
 /** POST a GraphQL document to the real endpoint and return status + parsed body. */
 export async function gql(query: string, headers: Record<string, string> = {}) {
-	const res = await fetch(`${base}${ENDPOINT}`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json', ...headers },
-		body: JSON.stringify({ query })
-	})
+  const res = await fetch(`${base}${ENDPOINT}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify({ query })
+  })
 
-	return {
-		status: res.status,
-		// tdwKoaErrorHandler answers rejected requests with {message, description}; Apollo answers
-		// accepted ones with {data, errors}. One parse covers both shapes.
-		//
-		// koa-utils' throw helpers build every GraphQLError the same way: the *title* is the message
-		// ('Bad Request', 'Forbidden', …) and the detail that names the offending field lives in
-		// `extensions.description`, with `extensions.http.status` telling Apollo what to answer.
-		json: (await res.json()) as {
-			data?: Record<string, unknown>
-			errors?: Array<{ message: string; extensions?: { description?: string; http?: { status: number } } }>
-			message?: string
-			description?: string
-		}
-	}
+  return {
+    status: res.status,
+    // tdwKoaErrorHandler answers rejected requests with {message, description}; Apollo answers
+    // accepted ones with {data, errors}. One parse covers both shapes.
+    //
+    // koa-utils' throw helpers build every GraphQLError the same way: the *title* is the message
+    // ('Bad Request', 'Forbidden', …) and the detail that names the offending field lives in
+    // `extensions.description`, with `extensions.http.status` telling Apollo what to answer.
+    json: (await res.json()) as {
+      data?: Record<string, unknown>
+      errors?: Array<{ message: string; extensions?: { description?: string; http?: { status: number } } }>
+      message?: string
+      description?: string
+    }
+  }
 }
 
 /**
@@ -108,30 +108,30 @@ export async function gql(query: string, headers: Record<string, string> = {}) {
  * collides on the second seed of the same run.
  */
 export async function seedUser(overrides: Record<string, unknown> = {}) {
-	const email = `itest-${randomUUID()}@marketplace.invalid`
-	const _id = new mongoose.Types.ObjectId()
+  const email = `itest-${randomUUID()}@marketplace.invalid`
+  const _id = new mongoose.Types.ObjectId()
 
-	// ⚠️ Encrypted after the overrides are spread in, and before the insert (ADR-029). After, so a
-	// caller that overrides `personalData` or `addresses` gets its own values encrypted too; before,
-	// because what this collection holds for a personal field is `binData` subtype 6, and a seed
-	// that wrote plaintext would be a document no resolver on the platform can produce.
-	await db()
-		.collection('user')
-		.insertOne(
-			await encryptDocument(
-				{
-					_id,
-					login: { email, password: PASSWORD_HASH },
-					registeredAt: new Date(),
-					...overrides
-				},
-				ENCRYPTED_FIELDS_USER,
-				KEY_ALT_NAME_USER
-			)
-		)
-	seededUsers.push(_id)
+  // ⚠️ Encrypted after the overrides are spread in, and before the insert (ADR-029). After, so a
+  // caller that overrides `personalData` or `addresses` gets its own values encrypted too; before,
+  // because what this collection holds for a personal field is `binData` subtype 6, and a seed
+  // that wrote plaintext would be a document no resolver on the platform can produce.
+  await db()
+    .collection('user')
+    .insertOne(
+      await encryptDocument(
+        {
+          _id,
+          login: { email, password: PASSWORD_HASH },
+          registeredAt: new Date(),
+          ...overrides
+        },
+        ENCRYPTED_FIELDS_USER,
+        KEY_ALT_NAME_USER
+      )
+    )
+  seededUsers.push(_id)
 
-	return { _id, email }
+  return { _id, email }
 }
 
 /**
@@ -145,13 +145,13 @@ export async function seedUser(overrides: Record<string, unknown> = {}) {
  * field keeps working. What is at rest is asserted separately, by `readUserEncrypted` below.
  */
 export async function readUser(_id: mongoose.Types.ObjectId) {
-	const stored = await db().collection('user').findOne({ _id })
+  const stored = await db().collection('user').findOne({ _id })
 
-	// In place, and it returns void: the document the caller gets back is the one just read, with
-	// every ciphertext replaced by its plaintext.
-	await decryptDocument(stored)
+  // In place, and it returns void: the document the caller gets back is the one just read, with
+  // every ciphertext replaced by its plaintext.
+  await decryptDocument(stored)
 
-	return stored
+  return stored
 }
 
 /**
@@ -162,7 +162,7 @@ export async function readUser(_id: mongoose.Types.ObjectId) {
  * would round-trip perfectly through both and show up nowhere else.
  */
 export async function readUserEncrypted(_id: mongoose.Types.ObjectId) {
-	return db().collection('user').findOne({ _id })
+  return db().collection('user').findOne({ _id })
 }
 
 /**
@@ -175,28 +175,28 @@ export async function readUserEncrypted(_id: mongoose.Types.ObjectId) {
  * a seed throws before the `try` — that is how a namespace collects orphan sessions.
  */
 export async function withSession(_id = new mongoose.Types.ObjectId(), email = 'cliente@marketplace.test') {
-	const token = `access:${randomUUID()}`
-	const key = sessionKey(token)
+  const token = `access:${randomUUID()}`
+  const key = sessionKey(token)
 
-	seededKeys.push(key)
-	// `tier` is what a real login writes and what this service asserts on every request: the auth
-	// middleware calls assertTier before ctx.state.user is set, so a tier-less seed is refused with
-	// 403 and every test built on this helper fails at the guard instead of reaching its resolver.
-	await redisClient.hSet(key, { _id: _id.toHexString(), email, tier: TIER.user })
+  seededKeys.push(key)
+  // `tier` is what a real login writes and what this service asserts on every request: the auth
+  // middleware calls assertTier before ctx.state.user is set, so a tier-less seed is refused with
+  // 403 and every test built on this helper fails at the guard instead of reaching its resolver.
+  await redisClient.hSet(key, { _id: _id.toHexString(), email, tier: TIER.user })
 
-	return {
-		_id,
-		headers: { authorization: `Bearer ${token}` },
-		cleanup: () => redisClient.del(key)
-	}
+  return {
+    _id,
+    headers: { authorization: `Bearer ${token}` },
+    cleanup: () => redisClient.del(key)
+  }
 }
 
 /** Seed a customer AND a session bound to them — the shape every resolver test needs. */
 export async function withSignedInUser(overrides: Record<string, unknown> = {}) {
-	const user = await seedUser(overrides)
-	const session = await withSession(user._id, user.email)
+  const user = await seedUser(overrides)
+  const session = await withSession(user._id, user.email)
 
-	return { ...user, ...session }
+  return { ...user, ...session }
 }
 
 /**
@@ -207,24 +207,24 @@ export async function withSignedInUser(overrides: Record<string, unknown> = {}) 
  * sits in the cluster for its whole TTL, which for an access session is up to 91 minutes.
  */
 export async function drainSafely(what: string, remove: () => Promise<unknown>) {
-	try {
-		await remove()
-	} catch (error) {
-		console.error(`[afterAll] cleanup failed for ${what}:`, error)
-	}
+  try {
+    await remove()
+  } catch (error) {
+    console.error(`[afterAll] cleanup failed for ${what}:`, error)
+  }
 }
 
 /** The tail every suite ends with: the customers seeded, then the session keys, then the three handles. */
 export async function drainAndClose(httpServer: Server) {
-	for (const _id of seededUsers) {
-		await drainSafely(`user ${_id.toString()}`, () => db().collection('user').deleteOne({ _id }))
-	}
-	// One del per key — this is a cluster, so a multi-key del would CROSSSLOT.
-	for (const key of seededKeys) {
-		await drainSafely(key, () => redisClient.del(key))
-	}
+  for (const _id of seededUsers) {
+    await drainSafely(`user ${_id.toString()}`, () => db().collection('user').deleteOne({ _id }))
+  }
+  // One del per key — this is a cluster, so a multi-key del would CROSSSLOT.
+  for (const key of seededKeys) {
+    await drainSafely(key, () => redisClient.del(key))
+  }
 
-	await new Promise<void>((resolve) => httpServer.close(() => resolve()))
-	await redisClient.close()
-	await mongoose.disconnect()
+  await new Promise<void>((resolve) => httpServer.close(() => resolve()))
+  await redisClient.close()
+  await mongoose.disconnect()
 }

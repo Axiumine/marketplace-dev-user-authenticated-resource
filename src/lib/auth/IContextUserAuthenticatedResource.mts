@@ -14,12 +14,12 @@ import { IncomingHttpHeaders } from 'http'
  * never have had to look at.
  */
 type IStateApi = {
-	user: IRedisDataUserForNode
+  user: IRedisDataUserForNode
 }
 export type IContextUserAuthenticatedResource = {
-	state: IStateApi
-	request: {
-		header?: TCommonHeaders & IncomingHttpHeaders
-	}
+  state: IStateApi
+  request: {
+    header?: TCommonHeaders & IncomingHttpHeaders
+  }
 }
 export {}

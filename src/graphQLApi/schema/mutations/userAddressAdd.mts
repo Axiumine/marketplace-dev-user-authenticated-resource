@@ -7,7 +7,7 @@ import { IUserAddressInput, validateUserAddress } from '@lib/validate/validateUs
 import { GraphQLError, GraphQLNonNull } from 'graphql'
 
 interface IArgs {
-	address: IUserAddressInput
+  address: IUserAddressInput
 }
 
 /**
@@ -28,21 +28,21 @@ interface IArgs {
  * from the write itself, through `tryCatchRethrow` like every other rejection here.
  */
 export const userAddressAdd = {
-	type: new GraphQLNonNull(OnlyIdType),
-	description: 'add an address to the signed-in customer',
-	args: {
-		address: { type: new GraphQLNonNull(GraphQLInputUserAddress) }
-	},
-	async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
-		const address = validateUserAddress(args.address)
+  type: new GraphQLNonNull(OnlyIdType),
+  description: 'add an address to the signed-in customer',
+  args: {
+    address: { type: new GraphQLNonNull(GraphQLInputUserAddress) }
+  },
+  async resolve(_: unknown, args: IArgs, ctx: IContextUserAuthenticatedResource) {
+    const address = validateUserAddress(args.address)
 
-		// `return await`, not `return`: without the await the promise escapes the try, so the catch
-		// below can never run and a validator rejection would surface as an unhandled rejection instead
-		// of the error tryCatchRethrow makes of it.
-		try {
-			return { _id: await funUserAddressAdd(ctx.state.user._id, address) }
-		} catch (e) {
-			tryCatchRethrow(e as GraphQLError | Error)
-		}
-	}
+    // `return await`, not `return`: without the await the promise escapes the try, so the catch
+    // below can never run and a validator rejection would surface as an unhandled rejection instead
+    // of the error tryCatchRethrow makes of it.
+    try {
+      return { _id: await funUserAddressAdd(ctx.state.user._id, address) }
+    } catch (e) {
+      tryCatchRethrow(e as GraphQLError | Error)
+    }
+  }
 }

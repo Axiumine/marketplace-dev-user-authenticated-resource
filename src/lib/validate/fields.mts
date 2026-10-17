@@ -54,12 +54,12 @@ export const MIN_AGE = 18
  * and not an overflow, and a box holding four spaces is empty rather than four characters long.
  */
 export const requiredText = (value: string, field: string, max: number): string => {
-	const clean = value.trim()
+  const clean = value.trim()
 
-	if (clean.length === 0) throwErrorWrongUserInput(`${field}: field required`)
-	if (clean.length > max) throwErrorWrongUserInput(`${field}: max ${max} characters`)
+  if (clean.length === 0) throwErrorWrongUserInput(`${field}: field required`)
+  if (clean.length > max) throwErrorWrongUserInput(`${field}: max ${max} characters`)
 
-	return clean
+  return clean
 }
 
 /**
@@ -70,12 +70,12 @@ export const requiredText = (value: string, field: string, max: number): string 
  * cleared landline number takes an otherwise valid save down with it.
  */
 export const optionalText = (value: string | null | undefined, field: string, max: number): string | undefined => {
-	const clean = (value ?? '').trim()
+  const clean = (value ?? '').trim()
 
-	if (clean.length === 0) return undefined
-	if (clean.length > max) throwErrorWrongUserInput(`${field}: max ${max} characters`)
+  if (clean.length === 0) return undefined
+  if (clean.length > max) throwErrorWrongUserInput(`${field}: max ${max} characters`)
 
-	return clean
+  return clean
 }
 
 /**
@@ -85,11 +85,11 @@ export const optionalText = (value: string | null | undefined, field: string, ma
  * empty string fails the pattern and gets the same 400 with a message that says what was expected.
  */
 export const textWithFormat = (value: string, field: string, shape: RegExp, expected: string): string => {
-	const clean = value.trim()
+  const clean = value.trim()
 
-	if (!shape.test(clean)) throwErrorWrongUserInput(`${field}: ${expected}`)
+  if (!shape.test(clean)) throwErrorWrongUserInput(`${field}: ${expected}`)
 
-	return clean
+  return clean
 }
 
 /**
@@ -99,9 +99,9 @@ export const textWithFormat = (value: string, field: string, shape: RegExp, expe
  * mutation here can touch. Blank comes back `undefined`, like every other optional field.
  */
 export const optionalEmail = (value: string | null | undefined, field: string): string | undefined => {
-	const clean = optionalText(value, field, MAX_EMAIL)
+  const clean = optionalText(value, field, MAX_EMAIL)
 
-	return clean === undefined ? undefined : textWithFormat(clean, field, SHAPE_EMAIL, 'invalid email address')
+  return clean === undefined ? undefined : textWithFormat(clean, field, SHAPE_EMAIL, 'invalid email address')
 }
 
 /**
@@ -116,12 +116,12 @@ export const optionalEmail = (value: string | null | undefined, field: string): 
  * steps back to the last day of the intended month instead.
  */
 const limitBirth = (today: Date): Date => {
-	const month = today.getUTCMonth()
-	const limit = new Date(Date.UTC(today.getUTCFullYear() - MIN_AGE, month, today.getUTCDate()))
+  const month = today.getUTCMonth()
+  const limit = new Date(Date.UTC(today.getUTCFullYear() - MIN_AGE, month, today.getUTCDate()))
 
-	if (limit.getUTCMonth() !== month) limit.setUTCDate(0)
+  if (limit.getUTCMonth() !== month) limit.setUTCDate(0)
 
-	return limit
+  return limit
 }
 
 /**
@@ -131,13 +131,13 @@ const limitBirth = (today: Date): Date => {
  * without freezing the clock. The boundary is inclusive: someone turning 18 today is 18 today.
  */
 export const birthDate = (date: Date, field: string, today: Date): Date => {
-	if (Number.isNaN(date.getTime())) throwErrorWrongUserInput(`${field}: invalid date`)
+  if (Number.isNaN(date.getTime())) throwErrorWrongUserInput(`${field}: invalid date`)
 
-	if (date.getTime() > limitBirth(today).getTime()) {
-		throwErrorWrongUserInput(`${field}: you must be of age (at least ${MIN_AGE})`)
-	}
+  if (date.getTime() > limitBirth(today).getTime()) {
+    throwErrorWrongUserInput(`${field}: you must be of age (at least ${MIN_AGE})`)
+  }
 
-	return date
+  return date
 }
 
 /**
@@ -153,14 +153,14 @@ export const birthDate = (date: Date, field: string, today: Date): Date => {
  * only correct when called from one place is worth less than the comparison costs.
  */
 export const coordinate = (coordinates: readonly number[], field: string): number[] => {
-	if (coordinates.length !== 2) {
-		throwErrorWrongUserInput(`${field}: exactly 2 coordinates are required [longitude, latitude]`)
-	}
+  if (coordinates.length !== 2) {
+    throwErrorWrongUserInput(`${field}: exactly 2 coordinates are required [longitude, latitude]`)
+  }
 
-	const [lng, lat] = coordinates as [number, number]
+  const [lng, lat] = coordinates as [number, number]
 
-	if (!Number.isFinite(lng) || lng < -180 || lng > 180) throwErrorWrongUserInput(`${field}: longitude outside -180..180`)
-	if (!Number.isFinite(lat) || lat < -90 || lat > 90) throwErrorWrongUserInput(`${field}: latitude outside -90..90`)
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) throwErrorWrongUserInput(`${field}: longitude outside -180..180`)
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) throwErrorWrongUserInput(`${field}: latitude outside -90..90`)
 
-	return [lng, lat]
+  return [lng, lat]
 }

@@ -31,7 +31,7 @@ import { bootServer, db, drainAndClose, gql, readUser, readUserEncrypted, seedUs
 let httpServer: Server
 
 const ADD = (extra = '') =>
-	`mutation { userAddressAdd(address: { street: "1 Main Street", postalCode: "01103", city: "Springfield", province: "ma"${extra} }) { _id } }`
+  `mutation { userAddressAdd(address: { street: "1 Main Street", postalCode: "01103", city: "Springfield", province: "ma"${extra} }) { _id } }`
 
 const DEL = (_id: unknown) => `mutation { userAddressDel(_id: "${String(_id)}") }`
 const SET_DEFAULT = (_id: unknown) => `mutation { userDefaultAddressSet(_id: "${String(_id)}") }`
@@ -40,338 +40,338 @@ const UPDATE = (_id: unknown, body: string) => `mutation { userAddressUpdate(_id
 
 /** Add one address through the real mutation and hand back the id the database minted for it. */
 async function addAddress(headers: Record<string, string>, extra = '') {
-	const { json } = await gql(ADD(extra), headers)
+  const { json } = await gql(ADD(extra), headers)
 
-	expect(json.errors).toBeUndefined()
-	const _id = (json.data?.userAddressAdd as { _id: string })._id
-	expect(mongoose.Types.ObjectId.isValid(_id)).toBe(true)
+  expect(json.errors).toBeUndefined()
+  const _id = (json.data?.userAddressAdd as { _id: string })._id
+  expect(mongoose.Types.ObjectId.isValid(_id)).toBe(true)
 
-	return new mongoose.Types.ObjectId(_id)
+  return new mongoose.Types.ObjectId(_id)
 }
 
 beforeAll(async () => {
-	;({ httpServer } = await bootServer())
+  ;({ httpServer } = await bootServer())
 })
 
 afterAll(() => drainAndClose(httpServer))
 
 describe('userAddressAdd', () => {
-	it('appends an element carrying a server-minted _id, and answers that id', async () => {
-		const user = await withSignedInUser()
+  it('appends an element carrying a server-minted _id, and answers that id', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers)
+    try {
+      const addressId = await addAddress(user.headers)
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses).toEqual([
-				{
-					_id: addressId,
-					street: '1 Main Street',
-					postalCode: '01103',
-					city: 'Springfield',
-					// Upper-cased on the way in, so `bg` and `BG` are one value in the database rather than two
-					// that sort apart and compare unequal.
-					province: 'MA'
-				}
-			])
-			// Not pointed at the first address automatically: the pointer is a value the customer chooses,
-			// and defaulting it here would leave "why is this the default?" with no answer.
-			expect(stored?.defaultAddress).toBeUndefined()
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses).toEqual([
+        {
+          _id: addressId,
+          street: '1 Main Street',
+          postalCode: '01103',
+          city: 'Springfield',
+          // Upper-cased on the way in, so `bg` and `BG` are one value in the database rather than two
+          // that sort apart and compare unequal.
+          province: 'MA'
+        }
+      ])
+      // Not pointed at the first address automatically: the pointer is a value the customer chooses,
+      // and defaulting it here would leave "why is this the default?" with no answer.
+      expect(stored?.defaultAddress).toBeUndefined()
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('stamps position.type server-side and stores a GeoJSON point', async () => {
-		const user = await withSignedInUser()
+  it('stamps position.type server-side and stores a GeoJSON point', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
+    try {
+      const addressId = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses[0]).toMatchObject({
-				_id: addressId,
-				label: 'home',
-				// The input carries coordinates only — `type` has exactly one legal value, so asking a client
-				// for the constant is only a way to receive `point` and fail the write.
-				position: { type: 'Point', coordinates: [9.57, 45.75] }
-			})
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses[0]).toMatchObject({
+        _id: addressId,
+        label: 'home',
+        // The input carries coordinates only — `type` has exactly one legal value, so asking a client
+        // for the constant is only a way to receive `point` and fail the write.
+        position: { type: 'Point', coordinates: [9.57, 45.75] }
+      })
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('keeps appending rather than replacing, so two identical addresses are two elements', async () => {
-		const user = await withSignedInUser()
+  it('keeps appending rather than replacing, so two identical addresses are two elements', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const first = await addAddress(user.headers)
-			const second = await addAddress(user.headers)
+    try {
+      const first = await addAddress(user.headers)
+      const second = await addAddress(user.headers)
 
-			expect(first.equals(second)).toBe(false)
+      expect(first.equals(second)).toBe(false)
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses).toHaveLength(2)
-			// The reason the mutation answers an id at all: the two elements are otherwise identical, so a
-			// bare Boolean would leave the client re-reading the account and guessing which one is new.
-			expect(stored?.addresses.map((a: { _id: mongoose.Types.ObjectId }) => a._id.toHexString())).toEqual([
-				first.toHexString(),
-				second.toHexString()
-			])
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses).toHaveLength(2)
+      // The reason the mutation answers an id at all: the two elements are otherwise identical, so a
+      // bare Boolean would leave the client re-reading the account and guessing which one is new.
+      expect(stored?.addresses.map((a: { _id: mongoose.Types.ObjectId }) => a._id.toHexString())).toEqual([
+        first.toHexString(),
+        second.toHexString()
+      ])
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	// ⚠️ Six, and the seventh is refused by the same `updateOne` that would have written it — the cap is
-	// a clause of the filter, not a count taken first. The 400 carries the number, because a limit the
-	// customer cannot see is a refusal they cannot act on. That MongoDB refuses a seventh element
-	// whatever this service says is proved with the raw driver further down.
-	it('accepts six addresses and refuses the seventh with a 400 naming the limit', async () => {
-		const user = await withSignedInUser()
+  // ⚠️ Six, and the seventh is refused by the same `updateOne` that would have written it — the cap is
+  // a clause of the filter, not a count taken first. The 400 carries the number, because a limit the
+  // customer cannot see is a refusal they cannot act on. That MongoDB refuses a seventh element
+  // whatever this service says is proved with the raw driver further down.
+  it('accepts six addresses and refuses the seventh with a 400 naming the limit', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			for (let i = 0; i < 6; i++) {
-				await addAddress(user.headers)
-			}
+    try {
+      for (let i = 0; i < 6; i++) {
+        await addAddress(user.headers)
+      }
 
-			const seventh = await gql(ADD(), user.headers)
+      const seventh = await gql(ADD(), user.headers)
 
-			expect(seventh.status).toBe(400)
-			expect(seventh.json.errors?.[0]?.extensions?.description).toBe('addresses: at most 6 addresses can be saved')
+      expect(seventh.status).toBe(400)
+      expect(seventh.json.errors?.[0]?.extensions?.description).toBe('addresses: at most 6 addresses can be saved')
 
-			// Refused whole: the account still holds the six it held before the call.
-			const stored = await readUser(user._id)
-			expect(stored?.addresses).toHaveLength(6)
-		} finally {
-			await user.cleanup()
-		}
-	})
+      // Refused whole: the account still holds the six it held before the call.
+      const stored = await readUser(user._id)
+      expect(stored?.addresses).toHaveLength(6)
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('rejects a malformed address before anything is written', async () => {
-		const user = await withSignedInUser()
+  it('rejects a malformed address before anything is written', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const cap = await gql(ADD().replace('01103', '2403'), user.headers)
-			expect(cap.status).toBe(400)
-			expect(cap.json.errors?.[0]?.extensions?.description).toBe('postalCode: the postal code is 5 digits')
+    try {
+      const cap = await gql(ADD().replace('01103', '2403'), user.headers)
+      expect(cap.status).toBe(400)
+      expect(cap.json.errors?.[0]?.extensions?.description).toBe('postalCode: the postal code is 5 digits')
 
-			const province = await gql(ADD().replace('"ma"', '"massachusetts"'), user.headers)
-			expect(province.json.errors?.[0]?.extensions?.description).toBe('province: the province is the 2-letter code')
+      const province = await gql(ADD().replace('"ma"', '"massachusetts"'), user.headers)
+      expect(province.json.errors?.[0]?.extensions?.description).toBe('province: the province is the 2-letter code')
 
-			// ±90 for latitude, not the ±180 longitude gets — a single rule for both would let this reach a
-			// 2dsphere index that cannot key it.
-			const lat = await gql(ADD(', position: { coordinates: [9.57, 120] }'), user.headers)
-			expect(lat.json.errors?.[0]?.extensions?.description).toBe('position.coordinates: latitude outside -90..90')
+      // ±90 for latitude, not the ±180 longitude gets — a single rule for both would let this reach a
+      // 2dsphere index that cannot key it.
+      const lat = await gql(ADD(', position: { coordinates: [9.57, 120] }'), user.headers)
+      expect(lat.json.errors?.[0]?.extensions?.description).toBe('position.coordinates: latitude outside -90..90')
 
-			expect((await readUser(user._id))?.addresses).toBeUndefined()
-		} finally {
-			await user.cleanup()
-		}
-	})
+      expect((await readUser(user._id))?.addresses).toBeUndefined()
+    } finally {
+      await user.cleanup()
+    }
+  })
 })
 
 describe('userAddressUpdate', () => {
-	it('replaces the element whole, keeping its _id and dropping cleared fields', async () => {
-		const user = await withSignedInUser()
+  it('replaces the element whole, keeping its _id and dropping cleared fields', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
+    try {
+      const addressId = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
 
-			const { status, json } = await gql(
-				UPDATE(addressId, '{ street: "2 Harbour Road", postalCode: "02108", city: "Boston", province: "MA", label: "" }'),
-				user.headers
-			)
+      const { status, json } = await gql(
+        UPDATE(addressId, '{ street: "2 Harbour Road", postalCode: "02108", city: "Boston", province: "MA", label: "" }'),
+        user.headers
+      )
 
-			expect(status).toBe(200)
-			expect(json.data).toEqual({ userAddressUpdate: true })
+      expect(status).toBe(200)
+      expect(json.data).toEqual({ userAddressUpdate: true })
 
-			const stored = await readUser(user._id)
-			// Whole-element replacement: the label and the point the customer cleared are gone rather than
-			// surviving under the new street. That is what an edit form means by an empty box.
-			expect(stored?.addresses).toEqual([
-				{ _id: addressId, street: '2 Harbour Road', postalCode: '02108', city: 'Boston', province: 'MA' }
-			])
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      // Whole-element replacement: the label and the point the customer cleared are gone rather than
+      // surviving under the new street. That is what an edit form means by an empty box.
+      expect(stored?.addresses).toEqual([
+        { _id: addressId, street: '2 Harbour Road', postalCode: '02108', city: 'Boston', province: 'MA' }
+      ])
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	/*
-	 * ⚠️ The reason `funUserAddressUpdate` writes `_id` back explicitly instead of letting the `$set`
-	 * of `addresses.$` mint a new one. Editing the address the pointer names must leave the pointer
-	 * valid — with a fresh id it would dangle, and the `$expr` would refuse the write outright.
-	 */
-	it('leaves defaultAddress valid when the default address is the one edited', async () => {
-		const user = await withSignedInUser()
+  /*
+   * ⚠️ The reason `funUserAddressUpdate` writes `_id` back explicitly instead of letting the `$set`
+   * of `addresses.$` mint a new one. Editing the address the pointer names must leave the pointer
+   * valid — with a fresh id it would dangle, and the `$expr` would refuse the write outright.
+   */
+  it('leaves defaultAddress valid when the default address is the one edited', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers)
-			await gql(SET_DEFAULT(addressId), user.headers)
+    try {
+      const addressId = await addAddress(user.headers)
+      await gql(SET_DEFAULT(addressId), user.headers)
 
-			const { json } = await gql(
-				UPDATE(addressId, '{ street: "2 Harbour Road", postalCode: "02108", city: "Boston", province: "MA" }'),
-				user.headers
-			)
-			expect(json.errors).toBeUndefined()
+      const { json } = await gql(
+        UPDATE(addressId, '{ street: "2 Harbour Road", postalCode: "02108", city: "Boston", province: "MA" }'),
+        user.headers
+      )
+      expect(json.errors).toBeUndefined()
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses[0]._id).toEqual(addressId)
-			expect(stored?.defaultAddress).toEqual(addressId)
-			expect(stored?.addresses[0].street).toBe('2 Harbour Road')
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses[0]._id).toEqual(addressId)
+      expect(stored?.defaultAddress).toEqual(addressId)
+      expect(stored?.addresses[0].street).toBe('2 Harbour Road')
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('answers 200 when an address is re-saved unchanged', async () => {
-		const user = await withSignedInUser()
+  it('answers 200 when an address is re-saved unchanged', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers)
-			const body = '{ street: "1 Main Street", postalCode: "01103", city: "Springfield", province: "MA" }'
+    try {
+      const addressId = await addAddress(user.headers)
+      const body = '{ street: "1 Main Street", postalCode: "01103", city: "Springfield", province: "MA" }'
 
-			await gql(UPDATE(addressId, body), user.headers)
-			// MongoDB reports `modifiedCount: 0` for this one, which is why the write path checks
-			// `matchedCount` — the alternative tells a customer their save broke when nothing did.
-			const { status, json } = await gql(UPDATE(addressId, body), user.headers)
+      await gql(UPDATE(addressId, body), user.headers)
+      // MongoDB reports `modifiedCount: 0` for this one, which is why the write path checks
+      // `matchedCount` — the alternative tells a customer their save broke when nothing did.
+      const { status, json } = await gql(UPDATE(addressId, body), user.headers)
 
-			expect(status).toBe(200)
-			expect(json.data).toEqual({ userAddressUpdate: true })
-		} finally {
-			await user.cleanup()
-		}
-	})
+      expect(status).toBe(200)
+      expect(json.data).toEqual({ userAddressUpdate: true })
+    } finally {
+      await user.cleanup()
+    }
+  })
 })
 
 describe('userDefaultAddressSet', () => {
-	it('points the pointer at one address, and moving it needs no clear step', async () => {
-		const user = await withSignedInUser()
+  it('points the pointer at one address, and moving it needs no clear step', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const home = await addAddress(user.headers)
-			const office = await addAddress(user.headers)
+    try {
+      const home = await addAddress(user.headers)
+      const office = await addAddress(user.headers)
 
-			expect((await gql(SET_DEFAULT(home), user.headers)).json.data).toEqual({ userDefaultAddressSet: true })
-			expect((await readUser(user._id))?.defaultAddress).toEqual(home)
+      expect((await gql(SET_DEFAULT(home), user.headers)).json.data).toEqual({ userDefaultAddressSet: true })
+      expect((await readUser(user._id))?.defaultAddress).toEqual(home)
 
-			// One `$set`, not "clear the others, then set this one". A second default is not forbidden
-			// here — it is inexpressible, so there is nothing to clear and no window to race.
-			expect((await gql(SET_DEFAULT(office), user.headers)).json.data).toEqual({ userDefaultAddressSet: true })
+      // One `$set`, not "clear the others, then set this one". A second default is not forbidden
+      // here — it is inexpressible, so there is nothing to clear and no window to race.
+      expect((await gql(SET_DEFAULT(office), user.headers)).json.data).toEqual({ userDefaultAddressSet: true })
 
-			const stored = await readUser(user._id)
-			expect(stored?.defaultAddress).toEqual(office)
-			expect(stored?.addresses).toHaveLength(2)
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.defaultAddress).toEqual(office)
+      expect(stored?.addresses).toHaveLength(2)
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('answers 200 when the default is re-set to what it already is', async () => {
-		const user = await withSignedInUser()
+  it('answers 200 when the default is re-set to what it already is', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers)
+    try {
+      const addressId = await addAddress(user.headers)
 
-			await gql(SET_DEFAULT(addressId), user.headers)
-			// A double-clicked button. `modifiedCount` is 0 here, `matchedCount` is 1.
-			const { status, json } = await gql(SET_DEFAULT(addressId), user.headers)
+      await gql(SET_DEFAULT(addressId), user.headers)
+      // A double-clicked button. `modifiedCount` is 0 here, `matchedCount` is 1.
+      const { status, json } = await gql(SET_DEFAULT(addressId), user.headers)
 
-			expect(status).toBe(200)
-			expect(json.data).toEqual({ userDefaultAddressSet: true })
-		} finally {
-			await user.cleanup()
-		}
-	})
+      expect(status).toBe(200)
+      expect(json.data).toEqual({ userDefaultAddressSet: true })
+    } finally {
+      await user.cleanup()
+    }
+  })
 })
 
 describe('userAddressDel', () => {
-	it('removes a non-default address and leaves the pointer alone', async () => {
-		const user = await withSignedInUser()
+  it('removes a non-default address and leaves the pointer alone', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const home = await addAddress(user.headers)
-			const office = await addAddress(user.headers)
-			await gql(SET_DEFAULT(home), user.headers)
+    try {
+      const home = await addAddress(user.headers)
+      const office = await addAddress(user.headers)
+      await gql(SET_DEFAULT(home), user.headers)
 
-			const { status, json } = await gql(DEL(office), user.headers)
+      const { status, json } = await gql(DEL(office), user.headers)
 
-			expect(status).toBe(200)
-			expect(json.data).toEqual({ userAddressDel: true })
+      expect(status).toBe(200)
+      expect(json.data).toEqual({ userAddressDel: true })
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses).toHaveLength(1)
-			expect(stored?.addresses[0]._id).toEqual(home)
-			expect(stored?.defaultAddress).toEqual(home)
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses).toHaveLength(1)
+      expect(stored?.addresses[0]._id).toEqual(home)
+      expect(stored?.defaultAddress).toEqual(home)
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	/*
-	 * ⚠️ The crown jewel, and the one assertion the unit suite structurally cannot make.
-	 *
-	 * The element and the pointer that names it go in ONE atomic write. Reading the document first
-	 * and deciding in Node would open a window for a concurrent `userDefaultAddressSet`; two
-	 * sequential `updateOne` calls would leave the document *invalid* in between, and the validator
-	 * would refuse the intermediate state anyway.
-	 */
-	it('clears defaultAddress in the same write when the default address is deleted', async () => {
-		const user = await withSignedInUser()
+  /*
+   * ⚠️ The crown jewel, and the one assertion the unit suite structurally cannot make.
+   *
+   * The element and the pointer that names it go in ONE atomic write. Reading the document first
+   * and deciding in Node would open a window for a concurrent `userDefaultAddressSet`; two
+   * sequential `updateOne` calls would leave the document *invalid* in between, and the validator
+   * would refuse the intermediate state anyway.
+   */
+  it('clears defaultAddress in the same write when the default address is deleted', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const home = await addAddress(user.headers)
-			const office = await addAddress(user.headers)
-			await gql(SET_DEFAULT(home), user.headers)
+    try {
+      const home = await addAddress(user.headers)
+      const office = await addAddress(user.headers)
+      await gql(SET_DEFAULT(home), user.headers)
 
-			const { json } = await gql(DEL(home), user.headers)
-			expect(json.errors).toBeUndefined()
+      const { json } = await gql(DEL(home), user.headers)
+      expect(json.errors).toBeUndefined()
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses).toHaveLength(1)
-			expect(stored?.addresses[0]._id).toEqual(office)
-			// `$$REMOVE`, so the field is absent rather than null — which is what `$unset` means and what
-			// `bsonType: 'objectId'` demands.
-			expect(Object.prototype.hasOwnProperty.call(stored!, 'defaultAddress')).toBe(false)
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses).toHaveLength(1)
+      expect(stored?.addresses[0]._id).toEqual(office)
+      // `$$REMOVE`, so the field is absent rather than null — which is what `$unset` means and what
+      // `bsonType: 'objectId'` demands.
+      expect(Object.prototype.hasOwnProperty.call(stored!, 'defaultAddress')).toBe(false)
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('removes the last address, pointer and all', async () => {
-		const user = await withSignedInUser()
+  it('removes the last address, pointer and all', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers)
-			await gql(SET_DEFAULT(addressId), user.headers)
+    try {
+      const addressId = await addAddress(user.headers)
+      await gql(SET_DEFAULT(addressId), user.headers)
 
-			expect((await gql(DEL(addressId), user.headers)).json.errors).toBeUndefined()
+      expect((await gql(DEL(addressId), user.headers)).json.errors).toBeUndefined()
 
-			const stored = await readUser(user._id)
-			expect(stored?.addresses).toEqual([])
-			expect(stored?.defaultAddress).toBeUndefined()
-		} finally {
-			await user.cleanup()
-		}
-	})
+      const stored = await readUser(user._id)
+      expect(stored?.addresses).toEqual([])
+      expect(stored?.defaultAddress).toBeUndefined()
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	// No `deleted` state on an address, so "already gone" is not a distinguishable case: the guard
-	// simply no longer finds it.
-	it('answers 403 on a second delete of the same address', async () => {
-		const user = await withSignedInUser()
+  // No `deleted` state on an address, so "already gone" is not a distinguishable case: the guard
+  // simply no longer finds it.
+  it('answers 403 on a second delete of the same address', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const addressId = await addAddress(user.headers)
-			await gql(DEL(addressId), user.headers)
+    try {
+      const addressId = await addAddress(user.headers)
+      await gql(DEL(addressId), user.headers)
 
-			const { status, json } = await gql(DEL(addressId), user.headers)
+      const { status, json } = await gql(DEL(addressId), user.headers)
 
-			expect(status).toBe(403)
-			expect(json.errors?.[0]?.message).toBe('Forbidden')
-		} finally {
-			await user.cleanup()
-		}
-	})
+      expect(status).toBe(403)
+      expect(json.errors?.[0]?.message).toBe('Forbidden')
+    } finally {
+      await user.cleanup()
+    }
+  })
 })
 
 /*
@@ -382,45 +382,45 @@ describe('userAddressDel', () => {
  * exist on the platform, and an id that exists is one worth guessing again.
  */
 describe('throwIfUserDontOwnAddress, over the real collection', () => {
-	it('refuses a stranger address with 403 on all three mutations that take one', async () => {
-		const user = await withSignedInUser()
-		const strangerAddressId = new mongoose.Types.ObjectId()
-		const stranger = await seedUser({
-			addresses: [{ _id: strangerAddressId, street: '9 Other Street', postalCode: '02108', city: 'Boston', province: 'MA' }],
-			defaultAddress: strangerAddressId
-		})
+  it('refuses a stranger address with 403 on all three mutations that take one', async () => {
+    const user = await withSignedInUser()
+    const strangerAddressId = new mongoose.Types.ObjectId()
+    const stranger = await seedUser({
+      addresses: [{ _id: strangerAddressId, street: '9 Other Street', postalCode: '02108', city: 'Boston', province: 'MA' }],
+      defaultAddress: strangerAddressId
+    })
 
-		try {
-			const body = '{ street: "1 My Street", postalCode: "01103", city: "Springfield", province: "MA" }'
+    try {
+      const body = '{ street: "1 My Street", postalCode: "01103", city: "Springfield", province: "MA" }'
 
-			for (const query of [DEL(strangerAddressId), SET_DEFAULT(strangerAddressId), UPDATE(strangerAddressId, body)]) {
-				const { status, json } = await gql(query, user.headers)
+      for (const query of [DEL(strangerAddressId), SET_DEFAULT(strangerAddressId), UPDATE(strangerAddressId, body)]) {
+        const { status, json } = await gql(query, user.headers)
 
-				expect(status).toBe(403)
-				expect(json.errors?.[0]?.message).toBe('Forbidden')
-			}
+        expect(status).toBe(403)
+        expect(json.errors?.[0]?.message).toBe('Forbidden')
+      }
 
-			// Untouched, and the guard ran before any write — not after one that silently matched nothing.
-			const other = await readUser(stranger._id)
-			expect(other?.addresses).toHaveLength(1)
-			expect(other?.addresses[0].street).toBe('9 Other Street')
-			expect(other?.defaultAddress).toEqual(strangerAddressId)
-		} finally {
-			await user.cleanup()
-		}
-	})
+      // Untouched, and the guard ran before any write — not after one that silently matched nothing.
+      const other = await readUser(stranger._id)
+      expect(other?.addresses).toHaveLength(1)
+      expect(other?.addresses[0].street).toBe('9 Other Street')
+      expect(other?.defaultAddress).toEqual(strangerAddressId)
+    } finally {
+      await user.cleanup()
+    }
+  })
 
-	it('refuses an address id that names nothing at all', async () => {
-		const user = await withSignedInUser()
+  it('refuses an address id that names nothing at all', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const { status } = await gql(DEL(new mongoose.Types.ObjectId()), user.headers)
+    try {
+      const { status } = await gql(DEL(new mongoose.Types.ObjectId()), user.headers)
 
-			expect(status).toBe(403)
-		} finally {
-			await user.cleanup()
-		}
-	})
+      expect(status).toBe(403)
+    } finally {
+      await user.cleanup()
+    }
+  })
 })
 
 /*
@@ -431,166 +431,166 @@ describe('throwIfUserDontOwnAddress, over the real collection', () => {
  * Error code 121 is `DocumentValidationFailure`.
  */
 describe('what the collection validator refuses (raw driver)', () => {
-	it('refuses a plain $pull of the default address — which is why the delete is a pipeline', async () => {
-		const addressId = new mongoose.Types.ObjectId()
-		const other = new mongoose.Types.ObjectId()
-		const user = await seedUser({
-			addresses: [
-				{ _id: addressId, street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' },
-				{ _id: other, street: '2 Harbour Road', postalCode: '02108', city: 'Boston', province: 'MA' }
-			],
-			defaultAddress: addressId
-		})
+  it('refuses a plain $pull of the default address — which is why the delete is a pipeline', async () => {
+    const addressId = new mongoose.Types.ObjectId()
+    const other = new mongoose.Types.ObjectId()
+    const user = await seedUser({
+      addresses: [
+        { _id: addressId, street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' },
+        { _id: other, street: '2 Harbour Road', postalCode: '02108', city: 'Boston', province: 'MA' }
+      ],
+      defaultAddress: addressId
+    })
 
-		// The naive delete: remove the element, leave the pointer. Refused, and it has to be — the
-		// pointer would name nothing, and nothing downstream would ever notice.
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, { $pull: { addresses: { _id: addressId } } } as never)
-		).rejects.toMatchObject({ code: 121 })
+    // The naive delete: remove the element, leave the pointer. Refused, and it has to be — the
+    // pointer would name nothing, and nothing downstream would ever notice.
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, { $pull: { addresses: { _id: addressId } } } as never)
+    ).rejects.toMatchObject({ code: 121 })
 
-		// Pulling a NON-default element is fine, which is what makes the rejection above specific to the
-		// pointer rather than to `$pull`.
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, { $pull: { addresses: { _id: other } } } as never)
-		).resolves.toMatchObject({ modifiedCount: 1 })
+    // Pulling a NON-default element is fine, which is what makes the rejection above specific to the
+    // pointer rather than to `$pull`.
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, { $pull: { addresses: { _id: other } } } as never)
+    ).resolves.toMatchObject({ modifiedCount: 1 })
 
-		const stored = await readUser(user._id)
-		expect(stored?.addresses).toHaveLength(1)
-		expect(stored?.defaultAddress).toEqual(addressId)
-	})
+    const stored = await readUser(user._id)
+    expect(stored?.addresses).toHaveLength(1)
+    expect(stored?.defaultAddress).toEqual(addressId)
+  })
 
-	it('refuses a defaultAddress that names an address of somebody else', async () => {
-		const addressId = new mongoose.Types.ObjectId()
-		const user = await seedUser({
-			addresses: [{ _id: addressId, street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' }]
-		})
+  it('refuses a defaultAddress that names an address of somebody else', async () => {
+    const addressId = new mongoose.Types.ObjectId()
+    const user = await seedUser({
+      addresses: [{ _id: addressId, street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' }]
+    })
 
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, { $set: { defaultAddress: new mongoose.Types.ObjectId() } })
-		).rejects.toMatchObject({ code: 121 })
-	})
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, { $set: { defaultAddress: new mongoose.Types.ObjectId() } })
+    ).rejects.toMatchObject({ code: 121 })
+  })
 
-	/*
-	 * ⚠️ The `$ifNull: ['$addresses', []]` inside the `$map` is load-bearing, and this is the document
-	 * that exercises it: a pointer with no array to look into. `$map` over a missing field yields null
-	 * and `$in` against null *errors* rather than answering false — so without the `$ifNull` this
-	 * would not be a clean validation failure but an aggregation error out of the validator itself.
-	 */
-	it('refuses a defaultAddress on a customer who has no addresses at all', async () => {
-		const user = await seedUser()
+  /*
+   * ⚠️ The `$ifNull: ['$addresses', []]` inside the `$map` is load-bearing, and this is the document
+   * that exercises it: a pointer with no array to look into. `$map` over a missing field yields null
+   * and `$in` against null *errors* rather than answering false — so without the `$ifNull` this
+   * would not be a clean validation failure but an aggregation error out of the validator itself.
+   */
+  it('refuses a defaultAddress on a customer who has no addresses at all', async () => {
+    const user = await seedUser()
 
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, { $set: { defaultAddress: new mongoose.Types.ObjectId() } })
-		).rejects.toMatchObject({ code: 121 })
-	})
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, { $set: { defaultAddress: new mongoose.Types.ObjectId() } })
+    ).rejects.toMatchObject({ code: 121 })
+  })
 
-	// The mirror of it: no pointer and no array is a perfectly good customer, which is what a fresh
-	// registration looks like. If the `$in` were reached with a null it would fail here too.
-	it('accepts a customer with neither a pointer nor an addresses array', async () => {
-		const user = await seedUser()
+  // The mirror of it: no pointer and no array is a perfectly good customer, which is what a fresh
+  // registration looks like. If the `$in` were reached with a null it would fail here too.
+  it('accepts a customer with neither a pointer nor an addresses array', async () => {
+    const user = await seedUser()
 
-		const stored = await readUser(user._id)
-		expect(stored?.addresses).toBeUndefined()
-		expect(stored?.defaultAddress).toBeUndefined()
-	})
+    const stored = await readUser(user._id)
+    expect(stored?.addresses).toBeUndefined()
+    expect(stored?.defaultAddress).toBeUndefined()
+  })
 
-	it('refuses an address element written with a null optional field', async () => {
-		const user = await seedUser()
+  it('refuses an address element written with a null optional field', async () => {
+    const user = await seedUser()
 
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, {
-					$push: {
-						addresses: {
-							_id: new mongoose.Types.ObjectId(),
-							street: '1 Main Street',
-							postalCode: '01103',
-							city: 'Springfield',
-							province: 'MA',
-							// What a cleared text box serialises to over GraphQL, and what `optionalText`
-							// exists to turn into an absent key.
-							label: null
-						}
-					}
-				} as never)
-		).rejects.toMatchObject({ code: 121 })
-	})
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, {
+          $push: {
+            addresses: {
+              _id: new mongoose.Types.ObjectId(),
+              street: '1 Main Street',
+              postalCode: '01103',
+              city: 'Springfield',
+              province: 'MA',
+              // What a cleared text box serialises to over GraphQL, and what `optionalText`
+              // exists to turn into an absent key.
+              label: null
+            }
+          }
+        } as never)
+    ).rejects.toMatchObject({ code: 121 })
+  })
 
-	// `maxItems: 6` on `addresses`, and this is the half that makes it a rule rather than a message: a
-	// writer that never goes near `funUserAddressAdd` is refused the seventh element too. The copy of
-	// the number in the service buys the shape of the refusal — a 400 a customer can read — and nothing
-	// more.
-	it('refuses a seventh address element, whatever wrote it', async () => {
-		const element = (n: number) => ({
-			_id: new mongoose.Types.ObjectId(),
-			street: `${n} Main Street`,
-			postalCode: '01103',
-			city: 'Springfield',
-			province: 'MA'
-		})
+  // `maxItems: 6` on `addresses`, and this is the half that makes it a rule rather than a message: a
+  // writer that never goes near `funUserAddressAdd` is refused the seventh element too. The copy of
+  // the number in the service buys the shape of the refusal — a 400 a customer can read — and nothing
+  // more.
+  it('refuses a seventh address element, whatever wrote it', async () => {
+    const element = (n: number) => ({
+      _id: new mongoose.Types.ObjectId(),
+      street: `${n} Main Street`,
+      postalCode: '01103',
+      city: 'Springfield',
+      province: 'MA'
+    })
 
-		// Seven in one insert: not a document this collection will hold at all.
-		await expect(seedUser({ addresses: Array.from({ length: 7 }, (_, i) => element(i)) })).rejects.toMatchObject({ code: 121 })
+    // Seven in one insert: not a document this collection will hold at all.
+    await expect(seedUser({ addresses: Array.from({ length: 7 }, (_, i) => element(i)) })).rejects.toMatchObject({ code: 121 })
 
-		// And six-plus-one, which is the case the mutation actually meets.
-		const user = await seedUser({ addresses: Array.from({ length: 6 }, (_, i) => element(i)) })
+    // And six-plus-one, which is the case the mutation actually meets.
+    const user = await seedUser({ addresses: Array.from({ length: 6 }, (_, i) => element(i)) })
 
-		// ⚠️ The pushed element is one already at rest, under a fresh `_id`. `db()` is the plain driver
-		// with no automatic encryption — `seedUser` encrypts by hand (ADR-029) — so a `$push` written in
-		// plaintext here would be refused for being plaintext, and would prove nothing about the cap.
-		const stored = await readUserEncrypted(user._id)
-		const seventh = { ...(stored?.addresses as Record<string, unknown>[])[0], _id: new mongoose.Types.ObjectId() }
+    // ⚠️ The pushed element is one already at rest, under a fresh `_id`. `db()` is the plain driver
+    // with no automatic encryption — `seedUser` encrypts by hand (ADR-029) — so a `$push` written in
+    // plaintext here would be refused for being plaintext, and would prove nothing about the cap.
+    const stored = await readUserEncrypted(user._id)
+    const seventh = { ...(stored?.addresses as Record<string, unknown>[])[0], _id: new mongoose.Types.ObjectId() }
 
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, { $push: { addresses: seventh } } as never)
-		).rejects.toMatchObject({ code: 121 })
-	})
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, { $push: { addresses: seventh } } as never)
+    ).rejects.toMatchObject({ code: 121 })
+  })
 
-	it('refuses an address element with no _id, which is what makes the pointer expressible', async () => {
-		const user = await seedUser()
+  it('refuses an address element with no _id, which is what makes the pointer expressible', async () => {
+    const user = await seedUser()
 
-		await expect(
-			db()
-				.collection('user')
-				.updateOne({ _id: user._id }, {
-					// `updateOne` is a query, so the Mongoose sub-document default that would supply an
-					// `_id` never runs — which is why `funUserAddressAdd` mints one by hand.
-					$push: { addresses: { street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' } }
-				} as never)
-		).rejects.toMatchObject({ code: 121 })
-	})
+    await expect(
+      db()
+        .collection('user')
+        .updateOne({ _id: user._id }, {
+          // `updateOne` is a query, so the Mongoose sub-document default that would supply an
+          // `_id` never runs — which is why `funUserAddressAdd` mints one by hand.
+          $push: { addresses: { street: '1 Main Street', postalCode: '01103', city: 'Springfield', province: 'MA' } }
+        } as never)
+    ).rejects.toMatchObject({ code: 121 })
+  })
 })
 
 describe('me, after the address surface has been exercised', () => {
-	it('reports the addresses and the pointer the mutations left behind', async () => {
-		const user = await withSignedInUser()
+  it('reports the addresses and the pointer the mutations left behind', async () => {
+    const user = await withSignedInUser()
 
-		try {
-			const home = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
-			const office = await addAddress(user.headers)
-			await gql(SET_DEFAULT(office), user.headers)
-			await gql(DEL(home), user.headers)
+    try {
+      const home = await addAddress(user.headers, ', label: "home", position: { coordinates: [9.57, 45.75] }')
+      const office = await addAddress(user.headers)
+      await gql(SET_DEFAULT(office), user.headers)
+      await gql(DEL(home), user.headers)
 
-			const { json } = await gql('{ me { addresses { _id label position { type coordinates } } defaultAddress } }', user.headers)
+      const { json } = await gql('{ me { addresses { _id label position { type coordinates } } defaultAddress } }', user.headers)
 
-			expect(json.errors).toBeUndefined()
-			expect(json.data?.me).toEqual({
-				addresses: [{ _id: office.toHexString(), label: null, position: null }],
-				defaultAddress: office.toHexString()
-			})
-		} finally {
-			await user.cleanup()
-		}
-	})
+      expect(json.errors).toBeUndefined()
+      expect(json.data?.me).toEqual({
+        addresses: [{ _id: office.toHexString(), label: null, position: null }],
+        defaultAddress: office.toHexString()
+      })
+    } finally {
+      await user.cleanup()
+    }
+  })
 })

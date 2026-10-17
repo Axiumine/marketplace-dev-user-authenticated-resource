@@ -63,30 +63,30 @@ const MAX_ADDRESSES = 6
  * first on a client that adds two addresses at once. The private area asks.
  */
 export async function funUserAddressAdd(_id: Types.ObjectId, address: Omit<IUserAddress, '_id'>): Promise<Types.ObjectId> {
-	const addressId = new Types.ObjectId()
+  const addressId = new Types.ObjectId()
 
-	const ret = await User.updateOne(
-		{ _id: _id, [`addresses.${MAX_ADDRESSES - 1}`]: trusted({ $exists: false }) },
-		{ $push: { addresses: { ...address, _id: addressId } } }
-	).exec()
+  const ret = await User.updateOne(
+    { _id: _id, [`addresses.${MAX_ADDRESSES - 1}`]: trusted({ $exists: false }) },
+    { $push: { addresses: { ...address, _id: addressId } } }
+  ).exec()
 
-	if (ret.matchedCount === 0) {
-		// Which half of the filter missed. Paid for only here, on the path that is already failing.
-		const found = await User.countDocuments({ _id: _id }).lean()
+  if (ret.matchedCount === 0) {
+    // Which half of the filter missed. Paid for only here, on the path that is already failing.
+    const found = await User.countDocuments({ _id: _id }).lean()
 
-		if (found === 0) {
-			throwInternalError()
-		}
+    if (found === 0) {
+      throwInternalError()
+    }
 
-		throwErrorWrongUserInput(`addresses: at most ${MAX_ADDRESSES} addresses can be saved`)
-	}
+    throwErrorWrongUserInput(`addresses: at most ${MAX_ADDRESSES} addresses can be saved`)
+  }
 
-	// `modifiedCount` is sound here where it is wrong for a profile save: a push always changes the
-	// array, so anything but 1 means the write did not land and the id about to be returned names
-	// nothing.
-	if (ret.modifiedCount !== 1) {
-		throwInternalError()
-	}
+  // `modifiedCount` is sound here where it is wrong for a profile save: a push always changes the
+  // array, so anything but 1 means the write did not land and the id about to be returned names
+  // nothing.
+  if (ret.modifiedCount !== 1) {
+    throwInternalError()
+  }
 
-	return addressId
+  return addressId
 }
