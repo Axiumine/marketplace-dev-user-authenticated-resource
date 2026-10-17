@@ -44,6 +44,11 @@ is a clause of the same `updateOne` that pushes, so two concurrent adds cannot b
 ⚠️ **A value containing whitespace must be single-quoted in the env file.** dotenv truncates a bare value
 at the first space with no error; double quotes would also expand `\n`/`\r` escapes.
 
+⚠️ **`osv-scanner.toml` ignores `GHSA-vfj7-8cjw-p6xm` (braces) until 2027-01-15, under ADR-057.** No patched
+`braces` exists and it is reachable only through devDependencies. The entry expires on purpose: after that
+date the Scorecard Vulnerabilities check and the pre-push floor gate fail again, and that failure is the
+review. Delete the entry as soon as a patched `braces` exists.
+
 ## Not a rename of the ShopOwner service
 
 Copied from `marketplace-dev-authenticated-resource` (4026): `assertTier(redData.tier, TIER.user)`
