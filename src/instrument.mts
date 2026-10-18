@@ -47,8 +47,8 @@ import * as Sentry from '@sentry/node'
  *
  * ⚠️ **`httpBodies` does not stop the request body reaching an event, and never did** (measured).
  * `@sentry/core` hard-wires `include.data = true` on the requestdata integration
- * (`integrations/requestdata.js:27-28`, above the comment *"dataCollection.httpBodies gates write-time,
- * not read-time"*), so the captured bytes are copied onto `event.request.data` whatever `httpBodies`
+ * (`integrations/requestdata.js:28-29`, the `data: true` line under the comment *"dataCollection.httpBodies
+ * gates write-time, not read-time"*), so the captured bytes are copied onto `event.request.data` whatever `httpBodies`
  * says — it reaches the `http.request.body.data` **span** attribute and nothing else. The write-time gate
  * is `maxIncomingRequestBodySize`, whose default is `"medium"`, which is why it is passed below: with it
  * at `"none"` the body is never captured, so there is nothing for a later hook to have to remove.
@@ -56,8 +56,8 @@ import * as Sentry from '@sentry/node'
  * `beforeSend` is not made redundant by any of this. `httpServerSpansIntegration` writes the client
  * address straight onto the server span, outside the `dataCollection` machinery entirely, where it is
  * reached by no option here and by neither value of the removed flag — only the scrubber takes it back
- * out. The SDK's own `SENSITIVE_KEY_SNIPPETS` filtering is a second layer and a minor-version
- * implementation detail, never a reason to shorten the scrubber's list.
+ * out. The SDK's own `SENSITIVE_KEY_SNIPPETS` filtering (`shouldFilterDataKey`, `filterKeyValueData.js:12`) is a
+ * second layer and a minor-version implementation detail, never a reason to shorten the scrubber's list.
  *
  * ⚠️ **`beforeSendTransaction` is the same function, and both hooks are needed** (measured). The
  * SDK routes transaction events to the second hook only, and the attributes the scrubber exists for —
@@ -89,6 +89,9 @@ if (process.env.DSN) {
       // the event body is stopped by `maxIncomingRequestBodySize` above. An omitted key would
       // collect all four.
       httpBodies: [],
+      // Removes the query string from every URL the SDK collects (`filterCollectedUrl` / `filterUrlQuery`):
+      // `event.request.url`, the server span's `url.full`, `http.url` and `http.target`, and the outgoing
+      // `url.query` and `http.query`. `false` is also what `requestdata` reads for `include.query_string`.
       urlQueryParams: false,
       // The document keeps its literal values redacted at collection time, so the query shape, the
       // transaction name and the stack still arrive and nothing needed for debugging is lost. The
