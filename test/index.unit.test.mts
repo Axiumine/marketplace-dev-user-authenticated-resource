@@ -14,7 +14,8 @@ const setupFieldEncryption = vi.fn()
 const hGetAll = vi.fn()
 const findById = vi.fn()
 
-vi.mock('@sentry/node', () => ({ captureException, captureMessage, flush }))
+// koa-utils >= 8 reads captureMessage and withScope off @sentry/node as soon as it loads, so the factory must export both.
+vi.mock('@sentry/node', () => ({ captureException, captureMessage, flush, withScope: vi.fn() }))
 vi.mock('@axiumine/koa-utils/dataSources/Redis', () => ({ RedisConnect, redisClient: { hGetAll } }))
 vi.mock('@axiumine/koa-utils/dataSources/MongoDB', () => ({ MongoDBConnect }))
 // Mocked because the real one opens a ClientEncryption against a live cluster and reads a 96-byte
