@@ -25,7 +25,8 @@ vi.mock('@lib/user/throwIfUserDontOwnAddress.mjs', () => ({ throwIfUserDontOwnAd
 vi.mock('@lib/auth/endEverySession.mjs', () => ({ endEverySession }))
 // The plain-Error arm of tryCatchRethrow reports before it rethrows; Sentry is never initialised in
 // the unit project, so this is both a stub and the assertion target for that arm.
-vi.mock('@sentry/node', () => ({ captureException }))
+// koa-utils >= 8 reads captureMessage and withScope off @sentry/node as soon as it loads, so the factory must export both.
+vi.mock('@sentry/node', () => ({ captureException, captureMessage: vi.fn(), withScope: vi.fn() }))
 
 const { userAddressAdd } = await import('../src/graphQLApi/schema/mutations/userAddressAdd.mts')
 const { userAddressDel } = await import('../src/graphQLApi/schema/mutations/userAddressDel.mts')
