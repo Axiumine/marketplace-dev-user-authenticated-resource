@@ -9,7 +9,6 @@ Tier/concern split, port table, terminology, auth model live there. Not here.
 |---|---|
 | what this svc is, suite shape | [`README.md`](./README.md) |
 | GraphQL surface, hook internals, gate order, node selection, trap details in full | [`REPO.md`](./REPO.md) |
-| GitNexus rules, this repo's registry name | [`AGENTS.md`](./AGENTS.md) |
 
 Token lifecycle → `marketplace-dev-user-authenticated-authorization` (4031). Logout →
 `marketplace-dev-authenticated-logout` (4030), all three tiers.
@@ -59,7 +58,7 @@ None of the four is an omission to "correct" back. Full comparison: [`REPO.md`](
 
 - **Never commit on `main`.** Branch first: `git switch -c <type>/<slug>`. Merge = user decision alone.
 - Merged → delete branch: `git branch -d <slug>`. `-d` only. `-D` never.
-- **No remote.** Push-on-request: no `git push` unless the user asked for it in that message.
+- **Push-on-request:** no `git push` unless the user asked for it in that message.
 - **Never lower a coverage or mutation threshold, and never remove a gate.** Threshold miss → write the
   missing test. Bypasses (`SKIP_QODANA=1`, `--no-verify`) are gate removals: use only when the user says so.
 - Two spaces, not tabs (ADR-058). Prettier owns indentation (`useTabs: false`, `tabWidth: 2`); eslint's `indent` rule is off.
@@ -70,10 +69,3 @@ None of the four is an omission to "correct" back. Full comparison: [`REPO.md`](
 
 commit → secret guard, lint, types, coverage, Qodana. push → same + semgrep (SAST) + trivy (dependency
 advisories) + mutation. All blocking. Why: [`REPO.md`](./REPO.md).
-
-## GitNexus
-
-⚠️ Run `impact({target, repo})` before editing a symbol; run `detect_changes()` before committing.
-`repo:` is mandatory and must always be a `marketplace*` registry name (this repo:
-`marketplace-dev-user-authenticated-resource`). Full rules, tools and resources: [`AGENTS.md`](./AGENTS.md)
-— AGENTS.md is not auto-loaded, so read it before a GitNexus-heavy task.
