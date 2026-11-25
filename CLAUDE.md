@@ -9,7 +9,6 @@ Tier/concern split, port table, terminology, auth model live there. Not here.
 |---|---|
 | what this svc is, suite shape | [`README.md`](./README.md) |
 | GraphQL surface, hook internals, gate order, node selection, trap details in full | [`REPO.md`](./REPO.md) |
-| GitNexus rules, this repo's registry name | [`AGENTS.md`](./AGENTS.md) |
 
 Token lifecycle → `marketplace-dev-user-authenticated-authorization` (4031). Logout →
 `marketplace-dev-authenticated-logout` (4030), all three tiers.
@@ -70,10 +69,3 @@ None of the four is an omission to "correct" back. Full comparison: [`REPO.md`](
 
 commit → secret guard, lint, types, coverage, Qodana. push → same + semgrep (SAST) + trivy (dependency
 advisories) + mutation. All blocking. Why: [`REPO.md`](./REPO.md).
-
-## GitNexus
-
-⚠️ Run `impact({target, repo})` before editing a symbol; run `detect_changes()` before committing.
-`repo:` is mandatory and must always be a `marketplace*` registry name (this repo:
-`marketplace-dev-user-authenticated-resource`). Full rules, tools and resources: [`AGENTS.md`](./AGENTS.md)
-— AGENTS.md is not auto-loaded, so read it before a GitNexus-heavy task.
